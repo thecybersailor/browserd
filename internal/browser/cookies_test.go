@@ -40,7 +40,10 @@ func TestCookieParams(t *testing.T) {
 }
 
 func TestImportCookiesInChrome(t *testing.T) {
-	const chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+	chrome := os.Getenv("CHROME_BIN")
+	if chrome == "" {
+		chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+	}
 	if _, err := os.Stat(chrome); err != nil {
 		t.Skip("local Chrome is not installed")
 	}
