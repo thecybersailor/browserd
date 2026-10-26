@@ -41,6 +41,9 @@ type SessionController struct {
 }
 
 type browserRuntime interface {
+	ImportCookies(runtimeSessionID string, cookies []browser.CookieInput) (int, error)
+	ImportCookieConfig(runtimeSessionID string, config browser.CookieConfig) (int, error)
+	ImportProfileCookies(config browser.CookieConfig) (int, error)
 	PrepareSession(runtimeSessionID string) error
 	Checkpoint(runtimeSessionID string) error
 	Close(runtimeSessionID string) error

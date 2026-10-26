@@ -235,6 +235,8 @@ type WaitForOutput struct {
 }
 
 type Service struct {
+	cookiesMu       sync.Mutex
+	cookieRevisions map[string]int64
 	navigatePage    func(context.Context, string) (NavigateOutput, error)
 	captureSnapshot func(context.Context) (snapshotRuntimeEnvelope, error)
 	sessions        session.Manager

@@ -6,6 +6,8 @@
 - `POST /v1/sessions`
 - `POST /v1/sessions/{runtimeSessionId}/commit`
 - `DELETE /v1/sessions/{runtimeSessionId}`
+- `POST /v1/sessions/{runtimeSessionId}/cookies/import`
+- `POST /v1/profiles/cookies`
 - `POST /v1/sessions/{runtimeSessionId}/navigate`
 - `GET /v1/sessions/{runtimeSessionId}/snapshot`
 - `POST /v1/sessions/{runtimeSessionId}/act`
@@ -283,3 +285,21 @@ BROWSERD_BASE_URL=http://127.0.0.1:7011 go test ./e2e -run '^TestNavigateSnapsho
 The deterministic test site is served by the test process and must be reachable
 from browserd (this command assumes they run on the same machine). A missing
 BROWSERD_BASE_URL is reported as NOT EXECUTED / SKIP, never as browser validation.
+
+## 导入 Cookie
+
+`POST /v1/sessions/{runtimeSessionId}/cookies/import`
+
+```json
+{
+  "cookies": [
+    {"name": "session", "value": "opaque=value", "url": "https://example.com/", "httpOnly": true}
+  ]
+}
+```
+
+每条必须提供 name、value、HTTP/HTTPS 根 URL，可选 httpOnly（默认 false）。导入为目标主机的 Cookie，path 为 `/`，HTTPS 自动设置 secure；不推测子域名或原 Cookie 的过期时间。值原样保留，不执行 URL 解码。同名同作用域 Cookie 覆盖，其他 Cookie 保留。拒绝重复项、非法字段与超过大小限制的输入。允许在手动浏览器会话中导入。
+
+成功响应 `data.importedCount` 是经 CDP 读取确认的数量；写入或校验失败返回错误。批量导入不是跨 Cookie 的事务，失败时部分 Cookie 可能已写入，可修正输入后重试。此接口不自行提交 profile；调用方可以保存导入配置，并在新会话初始化时重新导入。
+
+Host 配置同步使用 `POST /v1/profiles/cookies`，请求包含 `profilePath`、正整数 `revision` 及 `cookies`，响应 `data.updatedSessions` 表示更新的活跃会话数。它匹配 profile 的全部当前会话，不依赖 Host 的会话登记表。Cookie 数组可以为空，表示不再自动导入，不清除已有 Cookie。会话导入接口也接受同一配置，且校验会话所属 profile。较旧 revision 会被拒绝，调用方需刷新配置并重试创建会话；该版本约束在 browserd 当前进程的会话生命周期内有效。

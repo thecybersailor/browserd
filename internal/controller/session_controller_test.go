@@ -25,6 +25,8 @@ import (
 )
 
 type fakeBrowserRuntime struct {
+	cookieCalls     [][]browser.CookieInput
+	cookieErr       error
 	prepareErr      error
 	prepareCalls    []string
 	checkpointErr   error
@@ -1950,4 +1952,17 @@ func TestSessionOperationGuardRejectsInterleaving(t *testing.T) {
 	if rr.Code != 200 {
 		t.Fatalf("guard leaked: %s", rr.Body.String())
 	}
+}
+
+func (f *fakeBrowserRuntime) ImportCookies(_ string, cookies []browser.CookieInput) (int, error) {
+	f.cookieCalls = append(f.cookieCalls, cookies)
+	return len(cookies), f.cookieErr
+}
+
+func (f *fakeBrowserRuntime) ImportCookieConfig(id string, config browser.CookieConfig) (int, error) {
+	return f.ImportCookies(id, config.Cookies)
+}
+func (f *fakeBrowserRuntime) ImportProfileCookies(config browser.CookieConfig) (int, error) {
+	_, err := f.ImportCookies("", config.Cookies)
+	return 0, err
 }

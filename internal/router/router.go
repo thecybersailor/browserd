@@ -117,6 +117,9 @@ func New(cfg config.Config) http.Handler {
 			}
 			handler.ServeLiveView(w, r, token)
 			return
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/profiles/cookies":
+			handler.ImportProfileCookies(w, r)
+			return
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/sessions":
 			handler.CreateSession(w, r)
 			return
@@ -199,6 +202,14 @@ func New(cfg config.Config) http.Handler {
 				return
 			}
 			handler.PageTool(w, r, id)
+			return
+		case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/v1/sessions/") && strings.HasSuffix(r.URL.Path, "/cookies/import"):
+			id, ok := controller.ExtractRuntimeSessionID(strings.TrimSuffix(r.URL.Path, "/cookies/import"))
+			if !ok {
+				types.WriteErr(w, http.StatusBadRequest, "INVALID_REQUEST", "invalid runtimeSessionId")
+				return
+			}
+			handler.ImportCookies(w, r, id)
 			return
 		case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/v1/sessions/") && strings.HasSuffix(r.URL.Path, "/evaluate"):
 			id, ok := controller.ExtractRuntimeSessionID(strings.TrimSuffix(r.URL.Path, "/evaluate"))
