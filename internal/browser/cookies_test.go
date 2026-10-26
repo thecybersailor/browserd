@@ -49,10 +49,19 @@ func TestImportCookiesInChrome(t *testing.T) {
 	}
 	alloc, cancel := chromedp.NewExecAllocator(context.Background(), append(chromedp.DefaultExecAllocatorOptions[:], chromedp.ExecPath(chrome), chromedp.UserDataDir(t.TempDir()))...)
 	defer cancel()
-	ctx, cancel := chromedp.NewContext(alloc)
-	defer cancel()
-	ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
+	browserCtx, cancelBrowser := chromedp.NewContext(alloc)
+	defer cancelBrowser()
+	ctx, cancelTimeout := context.WithTimeout(browserCtx, 30*time.Second)
+	defer cancelTimeout()
+	defer func() {
+		// Stop Chrome gracefully before context cancellation and TempDir cleanup;
+		// killing its parent process can leave profile writers running on Linux.
+		shutdownCtx, cancelShutdown := context.WithTimeout(browserCtx, 10*time.Second)
+		defer cancelShutdown()
+		if err := chromedp.Cancel(shutdownCtx); err != nil {
+			t.Errorf("close test Chrome before profile cleanup: %v", err)
+		}
+	}()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { _, _ = io.WriteString(w, "<html>cookie test</html>") }))
 	defer server.Close()
 	target := server.URL + "/"
