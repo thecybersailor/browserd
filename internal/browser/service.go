@@ -2175,6 +2175,7 @@ func (s *Service) ensureBrowser(runtimeSessionID string) (*activeBrowser, error)
 	}
 
 	cmd := exec.Command(chromeBin, buildChromeArgs(BrowserOptions{
+		ProfileTransfer:     info.ProfileTransfer,
 		UserDataDir:         info.ProfileDir,
 		Headless:            !liveEnabled,
 		KioskMode:           liveEnabled,
@@ -2303,6 +2304,7 @@ func jsStringArray(values []string) string {
 }
 
 type BrowserOptions struct {
+	ProfileTransfer     bool
 	UserDataDir         string
 	Headless            bool
 	KioskMode           bool
@@ -2316,11 +2318,15 @@ func buildChromeArgs(opts BrowserOptions) []string {
 		"--disable-gpu",
 		"--no-sandbox",
 		"--no-first-run",
+		"--restore-last-session",
 		"--no-default-browser-check",
 		"--disable-dev-shm-usage",
 		"--remote-debugging-port=0",
 		"--force-color-profile=srgb",
 		"--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
+	}
+	if opts.ProfileTransfer {
+		args = append(args, "--disable-background-networking", "--disable-extensions", "--proxy-bypass-list=<-loopback>")
 	}
 	proxyServer := opts.Proxy.ChromeServer
 	if opts.ProxyOverrideServer != "" {

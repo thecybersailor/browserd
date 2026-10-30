@@ -117,6 +117,12 @@ func New(cfg config.Config) http.Handler {
 			}
 			handler.ServeLiveView(w, r, token)
 			return
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/profiles/export":
+			handler.TransferProfile(w, r, false)
+			return
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/profiles/import":
+			handler.TransferProfile(w, r, true)
+			return
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/profiles/cookies":
 			handler.ImportProfileCookies(w, r)
 			return

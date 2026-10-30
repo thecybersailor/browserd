@@ -23,11 +23,12 @@ var (
 )
 
 type CreateInput struct {
-	ProfilePath string
-	LeaseID     string
-	TTLSeconds  int
-	Fingerprint fingerprint.Config
-	ProxyServer string
+	ProfileTransfer bool
+	ProfilePath     string
+	LeaseID         string
+	TTLSeconds      int
+	Fingerprint     fingerprint.Config
+	ProxyServer     string
 }
 
 type CreateOutput struct {
@@ -46,6 +47,7 @@ type CommitOutput struct {
 }
 
 type SessionInfo struct {
+	ProfileTransfer  bool
 	RuntimeSessionID string
 	ProfilePath      string
 	ProfileDir       string
@@ -59,6 +61,7 @@ type SessionInfo struct {
 }
 
 type runtimeSession struct {
+	ProfileTransfer  bool
 	RuntimeSessionID string
 	ProfilePath      string
 	ProfileDir       string
@@ -89,12 +92,13 @@ type ManagerOptions struct {
 }
 
 type manager struct {
-	mu         sync.Mutex
-	store      profile.Store
-	workdir    string
-	cdpBaseURL string
-	sessions   map[string]runtimeSession
-	now        func() time.Time
+	profileLocks sync.Map
+	mu           sync.Mutex
+	store        profile.Store
+	workdir      string
+	cdpBaseURL   string
+	sessions     map[string]runtimeSession
+	now          func() time.Time
 }
 
 func NewManager(opts ManagerOptions) Manager {
@@ -124,6 +128,16 @@ func NewManager(opts ManagerOptions) Manager {
 }
 
 func (m *manager) Create(input CreateInput) (CreateOutput, error) {
+	canonical, err := normalizeProfilePath(input.ProfilePath)
+	if err != nil {
+		return CreateOutput{}, err
+	}
+	unlock := m.lockProfile(canonical)
+	defer unlock()
+	return m.create(input)
+}
+
+func (m *manager) create(input CreateInput) (CreateOutput, error) {
 	profilePath, err := normalizeProfilePath(input.ProfilePath)
 	if err != nil {
 		return CreateOutput{}, ErrInvalidRequest
@@ -173,6 +187,7 @@ func (m *manager) Create(input CreateInput) (CreateOutput, error) {
 	now := m.now().UTC()
 	m.mu.Lock()
 	m.sessions[rid] = runtimeSession{
+		ProfileTransfer:  input.ProfileTransfer,
 		RuntimeSessionID: rid,
 		ProfilePath:      profilePath,
 		ProfileDir:       profileDir,
@@ -338,6 +353,7 @@ func normalizeTTLSeconds(ttl int) int {
 
 func sessionInfoFromRuntime(s runtimeSession) SessionInfo {
 	return SessionInfo{
+		ProfileTransfer:  s.ProfileTransfer,
 		RuntimeSessionID: s.RuntimeSessionID,
 		ProfilePath:      s.ProfilePath,
 		ProfileDir:       s.ProfileDir,
@@ -349,4 +365,37 @@ func sessionInfoFromRuntime(s runtimeSession) SessionInfo {
 		Fingerprint:      s.Fingerprint,
 		ProxyServer:      s.ProxyServer,
 	}
+}
+
+// WithExclusiveProfile prevents new sessions while a temporary profile copy is
+// inspected or imported. Existing sessions (including agent sessions) reject it.
+func (m *manager) WithExclusiveProfile(input CreateInput, fn func(string) error) error {
+	path, err := normalizeProfilePath(input.ProfilePath)
+	if err != nil {
+		return err
+	}
+	unlock := m.lockProfile(path)
+	defer unlock()
+	m.mu.Lock()
+	for _, s := range m.sessions {
+		if s.ProfilePath == path {
+			m.mu.Unlock()
+			return fmt.Errorf("profile is in use; close all browser sessions and retry profile transfer")
+		}
+	}
+	m.mu.Unlock()
+	input.ProfileTransfer = true
+	out, err := m.create(input)
+	if err != nil {
+		return err
+	}
+	defer m.Delete(out.RuntimeSessionID)
+	return fn(out.RuntimeSessionID)
+}
+
+func (m *manager) lockProfile(path string) func() {
+	value, _ := m.profileLocks.LoadOrStore(strings.TrimSpace(path), new(sync.Mutex))
+	mutex := value.(*sync.Mutex)
+	mutex.Lock()
+	return mutex.Unlock
 }
