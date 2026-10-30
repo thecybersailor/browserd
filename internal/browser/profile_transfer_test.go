@@ -5,6 +5,8 @@ import (
 	_ "embed"
 	"encoding/json"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -17,17 +19,36 @@ import (
 var portableFixture []byte
 
 func TestProfileTransferNativeRoundTrip(t *testing.T) {
-	if _, err := os.Stat("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"); err != nil {
-		t.Skip("local Chrome is unavailable")
+	chrome := os.Getenv("CHROME_BIN")
+	if chrome == "" {
+		if runtime.GOOS == "darwin" {
+			chrome = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"
+		} else {
+			var err error
+			chrome, err = exec.LookPath("google-chrome")
+			if err != nil {
+				t.Skip("set CHROME_BIN to run native profile transfer tests")
+			}
+		}
 	}
-	t.Setenv("CHROME_BIN", "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome")
+	if _, err := os.Stat(chrome); err != nil {
+		t.Fatalf("CHROME_BIN is not usable: %v", err)
+	}
+	t.Setenv("CHROME_BIN", chrome)
+	t.Setenv("BROWSERD_LIVE_ENABLED", "false")
 	fp := fingerprint.FromSeed("profile-transfer-test")
 	manager := session.NewManager(session.ManagerOptions{Store: profile.NewMemoryStore(), Workdir: t.TempDir()})
 	svc := NewServiceWithOptions(ServiceOptions{Sessions: manager})
 	var bundle ProfileBundle
-	fixture:=portableFixture
- if path:=os.Getenv("PROFILE_TEST_INPUT");path!="" { var err error;fixture,err=os.ReadFile(path);if err!=nil {t.Fatal(err)} }
- if err := json.Unmarshal(fixture, &bundle); err != nil {
+	fixture := portableFixture
+	if path := os.Getenv("PROFILE_TEST_INPUT"); path != "" {
+		var err error
+		fixture, err = os.ReadFile(path)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := json.Unmarshal(fixture, &bundle); err != nil {
 		t.Fatal(err)
 	}
 	fp = bundle.Fingerprint.Config
