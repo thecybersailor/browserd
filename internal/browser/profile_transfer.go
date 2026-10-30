@@ -107,22 +107,34 @@ func portableCookie(c *network.Cookie) (PortableCookie, error) {
 	return out, nil
 }
 
-func cookieParam(c PortableCookie) *network.CookieParam {
+// Preserve fractional seconds directly. cdproto.TimeSinceEpoch marshals only
+// integer seconds, which would change exported Chrome Cookie expiration times.
+type portableCookieParam struct {
+	Name         string                      `json:"name"`
+	Value        string                      `json:"value"`
+	URL          string                      `json:"url,omitempty"`
+	Domain       string                      `json:"domain,omitempty"`
+	Path         string                      `json:"path"`
+	Secure       bool                        `json:"secure"`
+	HTTPOnly     bool                        `json:"httpOnly"`
+	SameSite     network.CookieSameSite      `json:"sameSite,omitempty"`
+	Expires      *float64                    `json:"expires,omitempty"`
+	PartitionKey *network.CookiePartitionKey `json:"partitionKey,omitempty"`
+}
+
+func cookieParam(c PortableCookie) *portableCookieParam {
 	scheme := "http"
 	if c.Secure {
 		scheme = "https"
 	}
-	out := &network.CookieParam{Name: c.Name, Value: c.Value, Path: c.Path, Secure: c.Secure, HTTPOnly: c.HTTPOnly, PartitionKey: c.PartitionKey}
+	out := &portableCookieParam{Name: c.Name, Value: c.Value, Path: c.Path, Secure: c.Secure, HTTPOnly: c.HTTPOnly, PartitionKey: c.PartitionKey}
 	if c.HostOnly {
 		out.URL = scheme + "://" + c.Domain + c.Path
 	} else {
 		out.Domain = c.Domain
 	}
 	out.SameSite = map[string]network.CookieSameSite{"lax": network.CookieSameSiteLax, "strict": network.CookieSameSiteStrict, "no_restriction": network.CookieSameSiteNone}[c.SameSite]
-	if c.ExpirationDate != nil {
-		stamp := cdp.TimeSinceEpoch(time.UnixMilli(int64(*c.ExpirationDate * 1000)))
-		out.Expires = &stamp
-	}
+	out.Expires = c.ExpirationDate
 	return out
 }
 
@@ -204,12 +216,14 @@ func (s *Service) TransferProfile(parent context.Context, in ProfileTransferInpu
 			if err := evalPortable(ctx, "("+portableRuntime+").validateProfile("+string(raw)+") && true", new(bool)); err != nil {
 				return err
 			}
-			params := make([]*network.CookieParam, 0, len(bundle.Cookies))
+			params := make([]*portableCookieParam, 0, len(bundle.Cookies))
 			for _, c := range bundle.Cookies {
 				params = append(params, cookieParam(c))
 			}
 			if len(params) > 0 {
-				if err := chromedp.Run(ctx, chromedp.ActionFunc(func(c context.Context) error { return network.SetCookies(params).Do(c) })); err != nil {
+				if err := chromedp.Run(ctx, chromedp.ActionFunc(func(c context.Context) error {
+					return cdp.Execute(c, "Network.setCookies", map[string]any{"cookies": params}, nil)
+				})); err != nil {
 					return err
 				}
 				// CDP may silently reject a cookie. Verify every imported scope/value.

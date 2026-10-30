@@ -51,6 +51,13 @@ func TestProfileTransferNativeRoundTrip(t *testing.T) {
 	if err := json.Unmarshal(fixture, &bundle); err != nil {
 		t.Fatal(err)
 	}
+	// Exercise fractional expiry through real CDP and profile persistence too.
+	for i := range bundle.Cookies {
+		if bundle.Cookies[i].ExpirationDate != nil {
+			expiry := float64(1798675200.123456)
+			bundle.Cookies[i].ExpirationDate = &expiry
+		}
+	}
 	fp = bundle.Fingerprint.Config
 	in := ProfileTransferInput{ProfilePath: "/test/profile.tgz", Fingerprint: fp, FingerprintSeed: fp.Seed, Bundle: &bundle, CookieRevision: 2}
 	if _, err := svc.TransferProfile(context.Background(), in, true); err != nil {
@@ -111,5 +118,22 @@ func TestProfileTransferNativeRoundTrip(t *testing.T) {
 	defer manager.Delete(live.RuntimeSessionID)
 	if _, err := svc.TransferProfile(context.Background(), in, false); err == nil {
 		t.Fatal("active profile accepted")
+	}
+}
+
+func TestPortableCookiePreservesFractionalExpiry(t *testing.T) {
+	expiry := float64(1798675200.123456)
+	raw, err := json.Marshal(cookieParam(PortableCookie{Name: "fractional", Value: "test", Domain: "example.com", Path: "/", HostOnly: true, ExpirationDate: &expiry}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var decoded struct {
+		Expires float64 `json:"expires"`
+	}
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatal(err)
+	}
+	if decoded.Expires != expiry {
+		t.Fatalf("expiry precision changed: expected %.6f, sent %.6f", expiry, decoded.Expires)
 	}
 }
