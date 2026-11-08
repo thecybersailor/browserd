@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 	"time"
@@ -25,6 +26,23 @@ func TestBrowserTaskRealChromeBeyondThirtySecondsAndCancellation(t *testing.T) {
 	if _, err := os.Stat(binary); err != nil {
 		t.Fatal(err)
 	}
+	// Use a real file: Chrome's background helpers may retain stderr after the
+	// browser exits, which otherwise leaves go test's output pipe open.
+	diagnosticsDir := t.TempDir()
+	logPath := filepath.Join(diagnosticsDir, "chrome.log")
+	launcher := filepath.Join(diagnosticsDir, "chrome")
+	quote := func(value string) string { return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'" }
+	if err := os.WriteFile(launcher, []byte("#!/bin/sh\nexec "+quote(binary)+" \"$@\" 2>"+quote(logPath)+"\n"), 0700); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("CHROME_BIN", launcher)
+	t.Cleanup(func() {
+		if t.Failed() {
+			if raw, err := os.ReadFile(logPath); err == nil {
+				t.Logf("native Chrome diagnostics: %s", raw)
+			}
+		}
+	})
 	t.Setenv("BROWSERD_LIVE_ENABLED", "false")
 	manager := session.NewManager(session.ManagerOptions{Store: profile.NewMemoryStore(), Workdir: t.TempDir()})
 	runtime := browser.NewService(manager, nil, nil)

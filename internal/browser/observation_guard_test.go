@@ -22,6 +22,13 @@ func TestObservationGuardRealChromeRejectsReplacedAndBlockedTargets(t *testing.T
 	defer closePage()
 	ctx, stop := context.WithTimeout(page, 30*time.Second)
 	defer stop()
+	defer func() {
+		shutdown, cancel := context.WithTimeout(page, 5*time.Second)
+		defer cancel()
+		if err := chromedp.Cancel(shutdown); err != nil {
+			t.Errorf("close observation test browser: %v", err)
+		}
+	}()
 	site := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte(`<html><body><input aria-label="Order" value="A123"><button id="save">Save</button></body></html>`))
 	}))
