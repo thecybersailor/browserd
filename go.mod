@@ -32,6 +32,6 @@ require (
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect
 	github.com/gobwas/ws v1.4.0
-	github.com/thecybersailor/browserd-client-go v0.0.0-20261108035954-f3a90d989536
+	github.com/thecybersailor/browserd-client-go v0.0.0-20261108055252-9d3159ca7765
 	golang.org/x/sys v0.34.0 // indirect
 )

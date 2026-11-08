@@ -39,8 +39,6 @@ import (
 )
 
 var (
-	ErrStaleObservation        = errors.New("observed page changed; capture a new snapshot before deciding again")
-	ErrTargetNotActionable     = errors.New("observed target is no longer actionable; capture a new snapshot before deciding again")
 	ErrInvalidRequest          = errors.New("invalid request")
 	ErrInvalidKey              = errors.New("invalid key")
 	ErrSnapshotFailed          = errors.New("snapshot failed")
@@ -128,24 +126,23 @@ type SnapshotOutput struct {
 }
 
 type ActInput struct {
-	ExpectedSnapshotID string   `json:"expectedSnapshotId,omitempty"`
-	Action             string   `json:"action"`
-	Ref                string   `json:"ref,omitempty"`
-	X                  float64  `json:"x,omitempty"`
-	Y                  float64  `json:"y,omitempty"`
-	DeltaX             float64  `json:"deltaX,omitempty"`
-	DeltaY             float64  `json:"deltaY,omitempty"`
-	Text               string   `json:"text,omitempty"`
-	HTML               string   `json:"html,omitempty"`
-	Key                string   `json:"key,omitempty"`
-	Value              string   `json:"value,omitempty"`
-	Values             []string `json:"values,omitempty"`
-	Clear              bool     `json:"clear,omitempty"`
-	Submit             bool     `json:"submit,omitempty"`
-	Button             string   `json:"button,omitempty"`
-	ClickCount         int      `json:"clickCount,omitempty"`
-	MotionProfile      string   `json:"motionProfile,omitempty"`
-	TimeoutMs          int      `json:"timeoutMs,omitempty"`
+	Action        string   `json:"action"`
+	Ref           string   `json:"ref,omitempty"`
+	X             float64  `json:"x,omitempty"`
+	Y             float64  `json:"y,omitempty"`
+	DeltaX        float64  `json:"deltaX,omitempty"`
+	DeltaY        float64  `json:"deltaY,omitempty"`
+	Text          string   `json:"text,omitempty"`
+	HTML          string   `json:"html,omitempty"`
+	Key           string   `json:"key,omitempty"`
+	Value         string   `json:"value,omitempty"`
+	Values        []string `json:"values,omitempty"`
+	Clear         bool     `json:"clear,omitempty"`
+	Submit        bool     `json:"submit,omitempty"`
+	Button        string   `json:"button,omitempty"`
+	ClickCount    int      `json:"clickCount,omitempty"`
+	MotionProfile string   `json:"motionProfile,omitempty"`
+	TimeoutMs     int      `json:"timeoutMs,omitempty"`
 }
 
 type ActOutput struct {
@@ -728,19 +725,6 @@ func (s *Service) Act(runtimeSessionID string, input ActInput) (ActOutput, error
 		return ActOutput{}, err
 	}
 	defer cancel()
-	if input.ExpectedSnapshotID != "" {
-		if input.X != 0 || input.Y != 0 || (input.Ref == "" && input.Action != "scroll") {
-			return ActOutput{}, ErrInvalidRequest
-		}
-		if err := s.validateObservation(ctx, runtimeSessionID, input); err != nil {
-			return ActOutput{}, err
-		}
-		if input.Action == "click" {
-			if err := s.checkObservation(ctx, runtimeSessionID, input, "prepareClick"); err != nil {
-				return ActOutput{}, err
-			}
-		}
-	}
 
 	switch input.Action {
 	case "click":
@@ -755,6 +739,9 @@ func (s *Service) Act(runtimeSessionID string, input ActInput) (ActOutput, error
 				return ActOutput{}, refErr
 			}
 			if err := validateActionRef(input.Action, refState); err != nil {
+				return ActOutput{}, err
+			}
+			if err = prepareOwnedLink(ctx, refState.Selector); err != nil {
 				return ActOutput{}, err
 			}
 			err = s.trustedClick(ctx, runtimeSessionID, refState.Selector, input)

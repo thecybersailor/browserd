@@ -1,10 +1,9 @@
 package browser
 
-// Generated from browser-snapshot BotWorks browser-snapshot runtime sha256:32267e956be1190ef9e636cbb1c8ed818680a38fe3598cfb4be9b0476ea50dda; DO NOT EDIT.
+// Generated from browser-snapshot BotWorks browser-snapshot runtime sha256:fe0e6c1c48fc423c195506d2d63dc6184c75b1b71c1334974519c415436e9b0e; DO NOT EDIT.
 const browserSnapshotRuntimeScript = `(() => {
   const captureSnapshotTree = function captureSnapshotTree(limits = { nodes: 12000, depth: 160, text: 4000 }) {
     const refs = {};
-    const observedNodes = new Map();
     const omissions = [];
     let sequence = 0;
     let refSequence = 0;
@@ -117,7 +116,6 @@ const browserSnapshotRuntimeScript = `(() => {
         if (actionable && !disabled && ((!invisible && laidOut) || fileInput) && type !== 'hidden') {
             node.ref = ` + "`" + `e${++refSequence}` + "`" + `;
             refs[node.ref] = { ref: node.ref, kind: 'element', tagName: el.tagName, selector, role: attrs.role || '', name: attrs['aria-label'] || attrs.title || attrs.placeholder || '' };
-            observedNodes.set(node.ref, el);
         }
         const children = [];
         let elementIndex = 0;
@@ -145,56 +143,6 @@ const browserSnapshotRuntimeScript = `(() => {
     };
     const tree = walk(document.documentElement, 'html', 0, 'n1', false) || { id: 'n1', tag: 'html' };
     const snapshotId = ` + "`" + `snap_${Date.now()}_${Math.random().toString(36).slice(2)}` + "`" + `;
-    const capturedDocument = document;
-    const semanticState = () => JSON.stringify({
-        url: location.href, baseURI: document.baseURI, title: document.title,
-        viewport: [globalThis.innerWidth, globalThis.innerHeight],
-        text: document.body?.innerText || document.body?.textContent || '',
-        targets: Array.from(observedNodes, ([ref, el]) => [ref, el.tagName,
-            Array.from(el.attributes).filter(attr => /^(id|name|type|href|action|method|formaction|formmethod|role|title|placeholder|aria-.+)$/.test(attr.name)).map(attr => [attr.name, attr.value]),
-            el.href || '', el.form?.action || '',
-        ]),
-        controls: Array.from(document.querySelectorAll('input,textarea,select,[contenteditable]')).map(raw => {
-            const el = raw;
-            return [el.tagName, el.id, el.getAttribute('name'), el.type === 'password' ? '' : el.value, el.checked, el.disabled, el.readOnly, el.getAttribute('aria-expanded'), el.getAttribute('aria-selected')];
-        })
-    });
-    const capturedSemantics = semanticState();
-    const guard = {
-        snapshotId,
-        prepareClick(expectedSnapshotId, ref) {
-            const checked = guard.validate(expectedSnapshotId, ref);
-            if (!checked.ok)
-                return checked;
-            // A guarded run owns one tab. Follow the selected observed anchor in
-            // that tab while preserving its normal click handlers.
-            const link = observedNodes.get(ref)?.closest('a[href]');
-            if (link instanceof HTMLAnchorElement)
-                link.target = '_self';
-            return { ok: true };
-        },
-        validate(expectedSnapshotId, ref) {
-            if (expectedSnapshotId !== snapshotId || document !== capturedDocument || semanticState() !== capturedSemantics)
-                return { ok: false, code: 'STALE_OBSERVATION' };
-            if (!ref)
-                return { ok: true };
-            const el = observedNodes.get(ref);
-            if (!el || !el.isConnected || document.querySelector(refs[ref].selector) !== el)
-                return { ok: false, code: 'STALE_OBSERVATION' };
-            const style = getComputedStyle(el);
-            if (el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true' || el.hasAttribute('inert') || style.display === 'none' || style.visibility !== 'visible' || style.opacity === '0')
-                return { ok: false, code: 'TARGET_NOT_ACTIONABLE' };
-            el.scrollIntoView({ block: 'center', inline: 'center' });
-            const box = el.getBoundingClientRect();
-            if (box.width <= 0 || box.height <= 0)
-                return { ok: false, code: 'TARGET_NOT_ACTIONABLE' };
-            const hit = document.elementFromPoint(box.left + box.width / 2, box.top + box.height / 2);
-            if (!hit || (hit !== el && !el.contains(hit)))
-                return { ok: false, code: 'TARGET_NOT_ACTIONABLE' };
-            return { ok: true };
-        }
-    };
-    globalThis.__browserActionGuard = guard;
     return { snapshotId, page: { formatVersion: 2, url: location.href, title: document.title, tree, capture: { scope: 'light-dom', complete: omissions.length === 0, omissions } }, refs };
 };
   const encodeCompactPage = function encodeCompactPage(page) {

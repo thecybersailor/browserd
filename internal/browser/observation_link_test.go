@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-func TestGuardedClickFollowsObservedLinkInOwnedSession(t *testing.T) {
+func TestClickFollowsSelectedLinkInOwnedSession(t *testing.T) {
 	if os.Getenv("CHROME_BIN") == "" {
 		t.Skip("set CHROME_BIN for native link execution acceptance")
 	}
@@ -37,7 +37,7 @@ func TestGuardedClickFollowsObservedLinkInOwnedSession(t *testing.T) {
 	if err = svc.PrepareSession(created.RuntimeSessionID); err != nil {
 		t.Fatal(err)
 	}
-	navigation, err := svc.Navigate(context.Background(), created.RuntimeSessionID, NavigateInput{URL: site.URL, WaitUntil: "load", IncludeSnapshot: true, TimeoutMs: 10000})
+	_, err = svc.Navigate(context.Background(), created.RuntimeSessionID, NavigateInput{URL: site.URL, WaitUntil: "load", IncludeSnapshot: true, TimeoutMs: 10000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -54,7 +54,7 @@ func TestGuardedClickFollowsObservedLinkInOwnedSession(t *testing.T) {
 	if ref == "" {
 		t.Fatal("the observed article link is missing")
 	}
-	_, err = svc.Act(created.RuntimeSessionID, ActInput{Action: "click", Ref: ref, ExpectedSnapshotID: navigation.Snapshot.SnapshotID, MotionProfile: "direct", TimeoutMs: 10000})
+	_, err = svc.Act(created.RuntimeSessionID, ActInput{Action: "click", Ref: ref, MotionProfile: "direct", TimeoutMs: 10000})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -68,7 +68,7 @@ func TestGuardedClickFollowsObservedLinkInOwnedSession(t *testing.T) {
 			return
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("guarded click left the owned session on %s instead of the selected article", observed.Page.URL)
+			t.Fatalf("click left the owned session on %s instead of the selected article", observed.Page.URL)
 		}
 		time.Sleep(20 * time.Millisecond)
 	}

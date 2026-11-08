@@ -58,6 +58,8 @@ github.com/thecybersailor/browserd-client-go v0.0.0-20261108022430-c9d88aa447a4 
 github.com/thecybersailor/browserd-client-go v0.0.0-20261108022430-c9d88aa447a4/go.mod h1:mOXy5X8NLDLyZPeu+DebZLR8Zm7AsiPN14gvg0qAoqY=
 github.com/thecybersailor/browserd-client-go v0.0.0-20261108035954-f3a90d989536 h1:MBip/NFdvsGI/OyAiovmXBD5aB8WxuVE40cJ49SnWkY=
 github.com/thecybersailor/browserd-client-go v0.0.0-20261108035954-f3a90d989536/go.mod h1:mOXy5X8NLDLyZPeu+DebZLR8Zm7AsiPN14gvg0qAoqY=
+github.com/thecybersailor/browserd-client-go v0.0.0-20261108055252-9d3159ca7765 h1:LoAvkT/SmqPhC+atGESSNdT4CdQTVDN8C7fbOP2byqI=
+github.com/thecybersailor/browserd-client-go v0.0.0-20261108055252-9d3159ca7765/go.mod h1:mOXy5X8NLDLyZPeu+DebZLR8Zm7AsiPN14gvg0qAoqY=
 golang.org/x/sys v0.6.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.34.0 h1:H5Y5sJ2L2JRdyv7ROF1he/lPdvFsd0mJHFw2ThKHxLA=
 golang.org/x/sys v0.34.0/go.mod h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k=
