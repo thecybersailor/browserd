@@ -2219,6 +2219,9 @@ func (s *Service) ensureBrowser(runtimeSessionID string) (*activeBrowser, error)
 		ProxyOverrideServer: proxyOverride,
 	})...)
 	cmd.Env = append(cmd.Environ(), chromeEnv...)
+	// Keep native startup diagnostics in service/test logs. A missing DevTools
+	// endpoint alone cannot distinguish an early Chrome exit from a slow start.
+	cmd.Stderr = os.Stderr
 	if err := cmd.Start(); err != nil {
 		if liveRuntime != nil {
 			_ = liveRuntime.Stop(context.Background())
