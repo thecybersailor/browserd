@@ -41,7 +41,7 @@ func TestNavigateSnapshotPipeline(t *testing.T) {
 				if err := c.Err(); err != nil {
 					return snapshotRuntimeEnvelope{}, err
 				}
-				return snapshotRuntimeEnvelope{Page: PageSnapshot{URL: "https://example.com/final", Title: "after", Groups: map[string]PageTable{}}, Refs: map[string]browserrt.RefState{"new-ref": {Ref: "new-ref"}}}, nil
+				return snapshotRuntimeEnvelope{SnapshotID: "snap_test", Page: PageSnapshot{URL: "https://example.com/final", Title: "after", Groups: map[string]PageTable{}}, Refs: map[string]browserrt.RefState{"new-ref": {Ref: "new-ref"}}}, nil
 			}
 			out, err := s.navigateWithContext(ctx, "rt", NavigateInput{URL: "https://example.com/", IncludeSnapshot: true})
 			if stage == "success" {

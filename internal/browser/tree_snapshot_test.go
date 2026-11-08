@@ -9,7 +9,7 @@ import (
 
 func TestTreeSnapshotRoundTrip(t *testing.T) {
 	var envelope snapshotRuntimeEnvelope
-	raw := `{"page":{"formatVersion":2,"url":"https://example.com/","tree":{"id":"n1","tag":"html","children":[{"id":"n2","tag":"button","ref":"e1","children":[{"id":"n3","tag":"#text","text":"Save"}]}]},"capture":{"scope":"light-dom","complete":true,"omissions":[]}},"refs":{"e1":{"ref":"e1","kind":"element","selector":"html > :nth-child(1)"}}}`
+	raw := `{"snapshotId":"snap_tree","page":{"formatVersion":2,"url":"https://example.com/","tree":{"id":"n1","tag":"html","children":[{"id":"n2","tag":"button","ref":"e1","children":[{"id":"n3","tag":"#text","text":"Save"}]}]},"capture":{"scope":"light-dom","complete":true,"omissions":[]}},"refs":{"e1":{"ref":"e1","kind":"element","selector":"html > :nth-child(1)"}}}`
 	if err := json.Unmarshal([]byte(raw), &envelope); err != nil {
 		t.Fatal(err)
 	}

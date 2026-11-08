@@ -8,7 +8,7 @@ import (
 func TestSnapshotIncludesObservedImageRequestContextForCurrentPage(t *testing.T) {
 	service := NewService(nil, nil, nil)
 	service.captureSnapshot = func(context.Context) (snapshotRuntimeEnvelope, error) {
-		return snapshotRuntimeEnvelope{Page: PageSnapshot{URL: "https://shop.example/collections/new", Groups: map[string]PageTable{}}}, nil
+		return snapshotRuntimeEnvelope{SnapshotID: "snap_test", Page: PageSnapshot{URL: "https://shop.example/collections/new", Groups: map[string]PageTable{}}}, nil
 	}
 	service.recordObservedImageRequest("rt_1", observedImageRequest{
 		URL:            "https://cdn.example/image.webp",
@@ -43,7 +43,7 @@ func TestSnapshotIncludesObservedImageRequestContextForCurrentPage(t *testing.T)
 func TestSnapshotDistinguishesObservedEmptyRefererFromUnknownImageRequest(t *testing.T) {
 	service := NewService(nil, nil, nil)
 	service.captureSnapshot = func(context.Context) (snapshotRuntimeEnvelope, error) {
-		return snapshotRuntimeEnvelope{Page: PageSnapshot{URL: "https://shop.example/collections/new", Groups: map[string]PageTable{}}}, nil
+		return snapshotRuntimeEnvelope{SnapshotID: "snap_test", Page: PageSnapshot{URL: "https://shop.example/collections/new", Groups: map[string]PageTable{}}}, nil
 	}
 	service.recordObservedImageRequest("rt_1", observedImageRequest{
 		URL:            "https://cdn.example/no-referer.webp",

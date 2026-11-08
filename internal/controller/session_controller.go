@@ -140,24 +140,25 @@ type commitSessionRequest struct {
 type navigateRequest = browserdclient.NavigateInput
 
 type actRequest struct {
-	Action        string          `json:"action"`
-	Ref           string          `json:"ref,omitempty"`
-	Target        json.RawMessage `json:"target,omitempty"`
-	X             float64         `json:"x,omitempty"`
-	Y             float64         `json:"y,omitempty"`
-	DeltaX        float64         `json:"deltaX,omitempty"`
-	DeltaY        float64         `json:"deltaY,omitempty"`
-	Text          string          `json:"text,omitempty"`
-	HTML          string          `json:"html,omitempty"`
-	Key           string          `json:"key,omitempty"`
-	Value         string          `json:"value,omitempty"`
-	Values        []string        `json:"values,omitempty"`
-	Clear         bool            `json:"clear,omitempty"`
-	Submit        bool            `json:"submit,omitempty"`
-	Button        string          `json:"button,omitempty"`
-	ClickCount    int             `json:"clickCount,omitempty"`
-	MotionProfile string          `json:"motionProfile,omitempty"`
-	TimeoutMs     int             `json:"timeoutMs,omitempty"`
+	ExpectedSnapshotID string          `json:"expectedSnapshotId,omitempty"`
+	Action             string          `json:"action"`
+	Ref                string          `json:"ref,omitempty"`
+	Target             json.RawMessage `json:"target,omitempty"`
+	X                  float64         `json:"x,omitempty"`
+	Y                  float64         `json:"y,omitempty"`
+	DeltaX             float64         `json:"deltaX,omitempty"`
+	DeltaY             float64         `json:"deltaY,omitempty"`
+	Text               string          `json:"text,omitempty"`
+	HTML               string          `json:"html,omitempty"`
+	Key                string          `json:"key,omitempty"`
+	Value              string          `json:"value,omitempty"`
+	Values             []string        `json:"values,omitempty"`
+	Clear              bool            `json:"clear,omitempty"`
+	Submit             bool            `json:"submit,omitempty"`
+	Button             string          `json:"button,omitempty"`
+	ClickCount         int             `json:"clickCount,omitempty"`
+	MotionProfile      string          `json:"motionProfile,omitempty"`
+	TimeoutMs          int             `json:"timeoutMs,omitempty"`
 }
 
 type waitForRequest = browserdclient.WaitForInput
@@ -387,23 +388,24 @@ func (h *SessionController) Act(w http.ResponseWriter, r *http.Request, runtimeS
 		return
 	}
 	out, err := h.browser.Act(runtimeSessionID, browser.ActInput{
-		Action:        req.Action,
-		Ref:           req.Ref,
-		X:             req.X,
-		Y:             req.Y,
-		DeltaX:        req.DeltaX,
-		DeltaY:        req.DeltaY,
-		Text:          req.Text,
-		HTML:          req.HTML,
-		Key:           req.Key,
-		Value:         req.Value,
-		Values:        req.Values,
-		Clear:         req.Clear,
-		Submit:        req.Submit,
-		Button:        req.Button,
-		ClickCount:    req.ClickCount,
-		MotionProfile: req.MotionProfile,
-		TimeoutMs:     req.TimeoutMs,
+		ExpectedSnapshotID: req.ExpectedSnapshotID,
+		Action:             req.Action,
+		Ref:                req.Ref,
+		X:                  req.X,
+		Y:                  req.Y,
+		DeltaX:             req.DeltaX,
+		DeltaY:             req.DeltaY,
+		Text:               req.Text,
+		HTML:               req.HTML,
+		Key:                req.Key,
+		Value:              req.Value,
+		Values:             req.Values,
+		Clear:              req.Clear,
+		Submit:             req.Submit,
+		Button:             req.Button,
+		ClickCount:         req.ClickCount,
+		MotionProfile:      req.MotionProfile,
+		TimeoutMs:          req.TimeoutMs,
 	})
 	if err != nil {
 		writeBrowserErr(w, err)
@@ -787,6 +789,10 @@ func writeBrowserErr(w http.ResponseWriter, err error) {
 		return
 	}
 	switch {
+	case errors.Is(err, browser.ErrStaleObservation):
+		types.WriteErr(w, http.StatusConflict, "STALE_OBSERVATION", err.Error())
+	case errors.Is(err, browser.ErrTargetNotActionable):
+		types.WriteErr(w, http.StatusConflict, "TARGET_NOT_ACTIONABLE", err.Error())
 	case errors.Is(err, session.ErrSessionNotFound):
 		types.WriteErr(w, http.StatusNotFound, "SESSION_NOT_FOUND", err.Error())
 	case errors.Is(err, runtime.ErrSnapshotNotFound):

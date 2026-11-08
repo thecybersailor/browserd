@@ -56,6 +56,8 @@ github.com/orisano/pixelmatch v0.0.0-20220722002657-fb0b55479cde h1:x0TT0RDC7UhA
 github.com/orisano/pixelmatch v0.0.0-20220722002657-fb0b55479cde/go.mod h1:nZgzbfBr3hhjoZnS66nKrHmduYNpc34ny7RK4z5/HM0=
 github.com/thecybersailor/browserd-client-go v0.0.0-20261108022430-c9d88aa447a4 h1:w0UoL/pZ4D3/Va5a9pKw/K1M9PXfJeWG2EtgEEPTF54=
 github.com/thecybersailor/browserd-client-go v0.0.0-20261108022430-c9d88aa447a4/go.mod h1:mOXy5X8NLDLyZPeu+DebZLR8Zm7AsiPN14gvg0qAoqY=
+github.com/thecybersailor/browserd-client-go v0.0.0-20261108035954-f3a90d989536 h1:MBip/NFdvsGI/OyAiovmXBD5aB8WxuVE40cJ49SnWkY=
+github.com/thecybersailor/browserd-client-go v0.0.0-20261108035954-f3a90d989536/go.mod h1:mOXy5X8NLDLyZPeu+DebZLR8Zm7AsiPN14gvg0qAoqY=
 golang.org/x/sys v0.6.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.34.0 h1:H5Y5sJ2L2JRdyv7ROF1he/lPdvFsd0mJHFw2ThKHxLA=
 golang.org/x/sys v0.34.0/go.mod h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k=

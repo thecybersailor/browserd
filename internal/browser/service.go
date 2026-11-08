@@ -39,6 +39,8 @@ import (
 )
 
 var (
+	ErrStaleObservation        = errors.New("observed page changed; capture a new snapshot before deciding again")
+	ErrTargetNotActionable     = errors.New("observed target is no longer actionable; capture a new snapshot before deciding again")
 	ErrInvalidRequest          = errors.New("invalid request")
 	ErrInvalidKey              = errors.New("invalid key")
 	ErrSnapshotFailed          = errors.New("snapshot failed")
@@ -126,23 +128,24 @@ type SnapshotOutput struct {
 }
 
 type ActInput struct {
-	Action        string   `json:"action"`
-	Ref           string   `json:"ref,omitempty"`
-	X             float64  `json:"x,omitempty"`
-	Y             float64  `json:"y,omitempty"`
-	DeltaX        float64  `json:"deltaX,omitempty"`
-	DeltaY        float64  `json:"deltaY,omitempty"`
-	Text          string   `json:"text,omitempty"`
-	HTML          string   `json:"html,omitempty"`
-	Key           string   `json:"key,omitempty"`
-	Value         string   `json:"value,omitempty"`
-	Values        []string `json:"values,omitempty"`
-	Clear         bool     `json:"clear,omitempty"`
-	Submit        bool     `json:"submit,omitempty"`
-	Button        string   `json:"button,omitempty"`
-	ClickCount    int      `json:"clickCount,omitempty"`
-	MotionProfile string   `json:"motionProfile,omitempty"`
-	TimeoutMs     int      `json:"timeoutMs,omitempty"`
+	ExpectedSnapshotID string   `json:"expectedSnapshotId,omitempty"`
+	Action             string   `json:"action"`
+	Ref                string   `json:"ref,omitempty"`
+	X                  float64  `json:"x,omitempty"`
+	Y                  float64  `json:"y,omitempty"`
+	DeltaX             float64  `json:"deltaX,omitempty"`
+	DeltaY             float64  `json:"deltaY,omitempty"`
+	Text               string   `json:"text,omitempty"`
+	HTML               string   `json:"html,omitempty"`
+	Key                string   `json:"key,omitempty"`
+	Value              string   `json:"value,omitempty"`
+	Values             []string `json:"values,omitempty"`
+	Clear              bool     `json:"clear,omitempty"`
+	Submit             bool     `json:"submit,omitempty"`
+	Button             string   `json:"button,omitempty"`
+	ClickCount         int      `json:"clickCount,omitempty"`
+	MotionProfile      string   `json:"motionProfile,omitempty"`
+	TimeoutMs          int      `json:"timeoutMs,omitempty"`
 }
 
 type ActOutput struct {
@@ -297,8 +300,9 @@ type activeBrowser struct {
 }
 
 type snapshotRuntimeEnvelope struct {
-	Page PageSnapshot                  `json:"page"`
-	Refs map[string]browserrt.RefState `json:"refs"`
+	SnapshotID string                        `json:"snapshotId"`
+	Page       PageSnapshot                  `json:"page"`
+	Refs       map[string]browserrt.RefState `json:"refs"`
 }
 
 func NewService(sessions session.Manager, state *browserrt.State, assetStore assets.Store) *Service {
@@ -567,7 +571,10 @@ func (s *Service) snapshotWithContext(ctx context.Context, runtimeSessionID stri
 		return SnapshotOutput{}, fmt.Errorf("%w: invalid observed page URL", ErrSnapshotFailed)
 	}
 
-	snapshotID := fmt.Sprintf("snap_%d", time.Now().UnixNano())
+	snapshotID := envelope.SnapshotID
+	if snapshotID == "" {
+		return SnapshotOutput{}, fmt.Errorf("%w: runtime did not provide an observation identifier", ErrSnapshotFailed)
+	}
 	page := envelope.Page
 	page.ImageRequests = s.observedImageRequestsForPage(runtimeSessionID, page.URL)
 	switch page.FormatVersion {
@@ -721,6 +728,19 @@ func (s *Service) Act(runtimeSessionID string, input ActInput) (ActOutput, error
 		return ActOutput{}, err
 	}
 	defer cancel()
+	if input.ExpectedSnapshotID != "" {
+		if input.X != 0 || input.Y != 0 || (input.Ref == "" && input.Action != "scroll") {
+			return ActOutput{}, ErrInvalidRequest
+		}
+		if err := s.validateObservation(ctx, runtimeSessionID, input); err != nil {
+			return ActOutput{}, err
+		}
+		if input.Action == "click" {
+			if err := s.checkObservation(ctx, runtimeSessionID, input, "prepareClick"); err != nil {
+				return ActOutput{}, err
+			}
+		}
+	}
 
 	switch input.Action {
 	case "click":

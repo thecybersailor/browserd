@@ -264,12 +264,21 @@ attributes, control states and necessary ancestor boundaries are retained.
 `capture.complete` describes bounded light-DOM capture, not page loading or
 business completeness. Frame/shadow-root boundaries and capture limits are
 explicit in `capture.omissions`. Structural node IDs cannot be used for actions.
-The embedded runtime is generated from the pinned shared `browser-snapshot`
-revision with `bash internal/browser/generate_browser_snapshot_runtime.sh`.
-For an explicit local-source trial, set `BROWSER_SNAPSHOT_SOURCE` to the shared
-package checkout when running that script. It builds that source and records
-the exported runtime SHA-256 in the generated header; it does not update the
-release pin. The published Go SDK supplies `DecodeSnapshotPage` for explicit
+Guarded clicks follow observed HTML links in the owned session tab, including
+`target="_blank"` links, preserving normal click handlers and dispatching once.
+The embedded runtime is generated from BotWorks' npm workspace package
+`packages/browser-snapshot`. Regeneration requires an explicit source checkout:
+
+```bash
+BROWSER_SNAPSHOT_SOURCE=/absolute/path/to/botworks/packages/browser-snapshot bash internal/browser/generate_browser_snapshot_runtime.sh
+```
+
+The script builds that package, exports `browser_snapshot_runtime.generated.js`,
+and records its SHA-256 in the generated Go header. Commit both generated files
+with a runtime change. Running the script without a source path regenerates the
+Go constant from that checked-in artifact, so CI verifies it without fetching
+another implementation. Normal Go builds consume the embedded constant.
+The published Go SDK supplies `DecodeSnapshotPage` for explicit
 legacy/v2/v3 decoding; release builds and tests use `GOWORK=off` and the versions
 in go.mod. Existing clients that require
 `page.groups` are incompatible until their version-aware readers are migrated;
