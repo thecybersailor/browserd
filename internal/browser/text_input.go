@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"context"
 	cdinput "github.com/chromedp/cdproto/input"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
@@ -10,6 +11,7 @@ import (
 // type action.
 type textInputKey struct {
 	Key       string
+	Command   string
 	Modifiers cdinput.Modifier
 }
 
@@ -23,7 +25,7 @@ type textInputKey struct {
 func planTextInputKeys(clear bool, submit bool) (before []textInputKey, after []textInputKey) {
 	if clear {
 		before = []textInputKey{
-			{Key: "a", Modifiers: cdinput.ModifierCtrl},
+			{Key: "a", Command: "selectAll"},
 			{Key: kb.Backspace},
 		}
 	}
@@ -34,8 +36,16 @@ func planTextInputKeys(clear bool, submit bool) (before []textInputKey, after []
 }
 
 func keyEventAction(key textInputKey) chromedp.Action {
-	if key.Modifiers == cdinput.ModifierNone {
-		return chromedp.KeyEvent(key.Key)
+	if key.Command != "" {
+		return chromedp.ActionFunc(func(ctx context.Context) error {
+			if err := cdinput.DispatchKeyEvent(cdinput.KeyRawDown).WithKey(key.Key).WithCommands([]string{key.Command}).Do(ctx); err != nil {
+				return err
+			}
+			return cdinput.DispatchKeyEvent(cdinput.KeyUp).WithKey(key.Key).Do(ctx)
+		})
 	}
-	return chromedp.KeyEvent(key.Key, chromedp.KeyModifiers(key.Modifiers))
+	if key.Modifiers != cdinput.ModifierNone {
+		return chromedp.KeyEvent(key.Key, chromedp.KeyModifiers(key.Modifiers))
+	}
+	return chromedp.KeyEvent(key.Key)
 }

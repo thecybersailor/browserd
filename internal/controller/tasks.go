@@ -186,6 +186,8 @@ func taskRuntimeError(err error) error {
 	switch {
 	case strings.Contains(err.Error(), "EVALUATE_RESULT_NOT_JSON"):
 		code = "EVALUATE_RESULT_NOT_JSON"
+	case errors.Is(err, browser.ErrSnapshotFailed):
+		code = "SNAPSHOT_FAILED"
 	case errors.Is(err, browser.ErrNavigationFailed):
 		code = "NAVIGATION_FAILED"
 	case errors.Is(err, browser.ErrEvaluateFailed):

@@ -3,7 +3,6 @@ package browser
 import (
 	"testing"
 
-	cdinput "github.com/chromedp/cdproto/input"
 	"github.com/chromedp/chromedp/kb"
 )
 
@@ -20,7 +19,7 @@ func TestPlanTextInputKeys_PlainTypeDispatchesNoSurroundingKeys(t *testing.T) {
 func TestPlanTextInputKeys_ClearSelectsAllThenDeletes(t *testing.T) {
 	before, after := planTextInputKeys(true, false)
 	want := []textInputKey{
-		{Key: "a", Modifiers: cdinput.ModifierCtrl},
+		{Key: "a", Command: "selectAll"},
 		{Key: kb.Backspace},
 	}
 	if len(before) != len(want) {

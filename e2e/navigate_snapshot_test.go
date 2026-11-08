@@ -3,6 +3,7 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	sdk "github.com/thecybersailor/browserd-client-go/pkg/browserd"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -36,7 +37,7 @@ func TestNavigateSnapshotE2E(t *testing.T) {
 			}
 			fmt.Fprint(w, "<body>slow</body>")
 		case "/async":
-			fmt.Fprint(w, `<body>Loading<script>setTimeout(()=>{document.body.innerHTML='<button id="buy">Buy delayed item $25</button>'},700)</script></body>`)
+			fmt.Fprint(w, `<body>Loading<script>setTimeout(()=>{document.body.innerHTML='<button data-test-id="buy">Buy delayed item $25</button>'},700)</script></body>`)
 		default:
 			fmt.Fprint(w, `<title>Catalog</title><body><a href="/item">Real item $25</a><button onclick="this.textContent='Purchased'">Buy item</button></body>`)
 		}
@@ -51,11 +52,8 @@ func TestNavigateSnapshotE2E(t *testing.T) {
 	defer mustDoJSON(t, "DELETE", session, nil)
 	var snapshotID string
 	for _, path := range []string{"/catalog", "/redirect"} {
-		status, out := mustDoJSON(t, "POST", session+"/navigate", map[string]any{"url": site.URL + path, "includeSnapshot": true, "waitUntil": "load", "timeoutMs": 5000})
-		if status != 200 {
-			t.Fatalf("navigate: %d %+v", status, out)
-		}
-		snap, ok := out.Data["snapshot"].(map[string]any)
+		out := successfulTaskObject(t, submitHTTPTaskAndWatch(t, session, "navigate", map[string]any{"url": site.URL + path, "includeSnapshot": true, "waitUntil": "load", "executionTimeoutMs": 5000}))
+		snap, ok := out["snapshot"].(map[string]any)
 		if !ok {
 			t.Fatalf("navigation did not return snapshot: %+v", out)
 		}
@@ -64,7 +62,7 @@ func TestNavigateSnapshotE2E(t *testing.T) {
 		}
 		snapshotID = fmt.Sprint(snap["snapshotId"])
 		page := snap["page"].(map[string]any)
-		if page["url"] != site.URL+"/catalog" || out.Data["url"] != page["url"] {
+		if page["url"] != site.URL+"/catalog" || out["url"] != page["url"] {
 			t.Fatalf("redirect observation inconsistent: %+v", out)
 		}
 		raw, _ := json.Marshal(page)
@@ -77,38 +75,32 @@ func TestNavigateSnapshotE2E(t *testing.T) {
 			t.Fatalf("returned ref cannot act: %d %+v", status, act)
 		}
 	}
-	status, out := mustDoJSON(t, "POST", session+"/navigate", map[string]any{"url": site.URL + "/network", "includeSnapshot": true, "timeoutMs": 3000})
-	if status != 200 || out.Data["snapshot"] == nil {
-		t.Fatalf("continuous background network blocked load observation: %d %+v", status, out)
+	out := successfulTaskObject(t, submitHTTPTaskAndWatch(t, session, "navigate", map[string]any{"url": site.URL + "/network", "includeSnapshot": true, "executionTimeoutMs": 3000}))
+	if out["snapshot"] == nil {
+		t.Fatalf("continuous background network blocked load observation: %+v", out)
 	}
-	status, out = mustDoJSON(t, "POST", session+"/navigate", map[string]any{"url": site.URL + "/broken", "includeSnapshot": true, "timeoutMs": 3000})
-	if status != 502 || out.Data != nil || out.Error["code"] != "SNAPSHOT_FAILED" {
-		t.Fatalf("extraction failure not distinguished: %d %+v", status, out)
+	broken := submitHTTPTaskAndWatch(t, session, "navigate", map[string]any{"url": site.URL + "/broken", "includeSnapshot": true, "executionTimeoutMs": 3000})
+	if broken.State != sdk.TaskFailed || len(broken.Info.Result) != 0 || broken.Info.Error == nil || broken.Info.Error.Code != "SNAPSHOT_FAILED" {
+		t.Fatalf("extraction failure not distinguished: %+v", broken)
 	}
-	status, out = mustDoJSON(t, "POST", session+"/act", map[string]any{"action": "click", "ref": "e1"})
+	status, response := mustDoJSON(t, "POST", session+"/act", map[string]any{"action": "click", "ref": "e1"})
 	if status == 200 {
 		t.Fatal("failed observation retained actionable stale refs")
 	}
-	status, out = mustDoJSON(t, "POST", session+"/navigate", map[string]any{"url": site.URL + "/async", "includeSnapshot": true})
-	if status != 200 || out.Data["snapshot"] == nil {
+	out = successfulTaskObject(t, submitHTTPTaskAndWatch(t, session, "navigate", map[string]any{"url": site.URL + "/async", "includeSnapshot": true}))
+	if out["snapshot"] == nil {
 		t.Fatalf("async navigation failed: %+v", out)
 	}
-	status, out = mustDoJSON(t, "POST", session+"/wait-for", map[string]any{"condition": map[string]any{"type": "element_visible", "selector": "#buy"}, "timeoutMs": 5000})
-	if status != 200 {
-		t.Fatalf("explicit wait failed: %+v", out)
-	}
-	status, out = mustDoJSON(t, "GET", session+"/snapshot", nil)
-	raw, _ := json.Marshal(out.Data)
+	successfulTaskObject(t, submitHTTPTaskAndWatch(t, session, "wait-for", map[string]any{"condition": map[string]any{"type": "element_visible", "selector": "[data-test-id=buy]"}, "executionTimeoutMs": 5000}))
+	status, response = mustDoJSON(t, "GET", session+"/snapshot", nil)
+	raw, _ := json.Marshal(response.Data)
 	if status != 200 || !strings.Contains(string(raw), "Buy delayed item $25") {
 		t.Fatalf("fresh observation missing async facts: %s", raw)
 	}
 	// Evaluate -> native PageTool must not recursively acquire the request guard.
-	status, out = mustDoJSON(t, "POST", session+"/evaluate", map[string]any{"script": "return await window.__browserdPageToolCall({method:'page.title',payload:{}});", "pageToolBridge": map[string]any{"name": "__browserdPageToolCall", "enabled": true}, "timeoutMs": 3000})
-	if status != 200 {
-		t.Fatalf("evaluate bridge: %d %+v", status, out)
-	}
-	status, out = mustDoJSON(t, "POST", session+"/navigate", map[string]any{"url": site.URL + "/slow", "includeSnapshot": true, "timeoutMs": 100})
-	if status == 200 || out.Data != nil {
-		t.Fatalf("timeout returned success: %d %+v", status, out)
+	successfulTaskObject(t, submitHTTPTaskAndWatch(t, session, "evaluate", map[string]any{"script": "return await window.__browserdPageToolCall({method:'page.title',payload:{}});", "pageToolBridge": map[string]any{"name": "__browserdPageToolCall", "enabled": true}, "executionTimeoutMs": 3000}))
+	slow := submitHTTPTaskAndWatch(t, session, "navigate", map[string]any{"url": site.URL + "/slow", "includeSnapshot": true, "executionTimeoutMs": 100})
+	if slow.State != sdk.TaskTimedOut || len(slow.Info.Result) != 0 {
+		t.Fatalf("timeout returned success: %+v", slow)
 	}
 }

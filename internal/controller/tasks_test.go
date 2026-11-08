@@ -1,6 +1,7 @@
 package controller_test
 
 import (
+	"browserd/internal/browser"
 	"browserd/internal/controller"
 	"context"
 	sdk "github.com/thecybersailor/browserd-client-go/pkg/browserd"
@@ -9,6 +10,23 @@ import (
 	"testing"
 	"time"
 )
+
+func TestAsyncNavigatePreservesSnapshotFailureCode(t *testing.T) {
+	h := controller.NewSessionController(&fakeSessionManager{}, &fakeBrowserRuntime{navigateErr: browser.ErrSnapshotFailed}, "")
+	rr := httptest.NewRecorder()
+	h.Navigate(rr, httptest.NewRequest("POST", "/", strings.NewReader(`{"request_id":"snapshot-error","url":"https://example.com/","includeSnapshot":true}`)), "rt")
+	if rr.Code != 202 {
+		t.Fatalf("submit: %d %s", rr.Code, rr.Body)
+	}
+	id := decodeData(t, rr)["browserd_task_id"].(string)
+	watch := httptest.NewRecorder()
+	h.WatchTask(watch, httptest.NewRequest("POST", "/", strings.NewReader(`{"timeoutMs":1000}`)), id)
+	data := decodeData(t, watch)
+	failure := data["info"].(map[string]any)["error"].(map[string]any)
+	if data["state"] != "failed" || failure["code"] != "SNAPSHOT_FAILED" {
+		t.Fatalf("snapshot failure lost: %s", watch.Body)
+	}
+}
 
 func TestAsyncNavigateSurvivesSubmittingRequestCancellation(t *testing.T) {
 	b := &blockedNavigationRuntime{started: make(chan struct{}), release: make(chan struct{})}

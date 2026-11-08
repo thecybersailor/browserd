@@ -98,11 +98,8 @@ func TestSnapshotDOMTreeE2E(t *testing.T) {
 	}
 	session := base + "/v1/sessions/" + fmt.Sprint(created.Data["runtimeSessionId"])
 	defer mustDoJSON(t, "DELETE", session, nil)
-	status, out := mustDoJSON(t, "POST", session+"/navigate", map[string]any{"url": site.URL, "includeSnapshot": true, "waitUntil": "load"})
-	if status != 200 {
-		t.Fatalf("navigate: %d %+v", status, out)
-	}
-	page := out.Data["snapshot"].(map[string]any)["page"].(map[string]any)
+	out := successfulTaskObject(t, submitHTTPTaskAndWatch(t, session, "navigate", map[string]any{"url": site.URL, "includeSnapshot": true, "waitUntil": "load"}))
+	page := out["snapshot"].(map[string]any)["page"].(map[string]any)
 	if _, ok := page["groups"]; ok {
 		t.Fatal("legacy groups emitted alongside tree")
 	}
