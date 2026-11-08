@@ -94,6 +94,21 @@ func New(cfg config.Config) http.Handler {
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch {
+		case r.Method == http.MethodPost && strings.HasPrefix(r.URL.Path, "/v1/tasks/"):
+			parts := strings.Split(strings.TrimPrefix(r.URL.Path, "/v1/tasks/"), "/")
+			if len(parts) != 2 || parts[0] == "" {
+				types.WriteErr(w, 400, "INVALID_REQUEST", "use /v1/tasks/{browserd_task_id}/watch or /cancel")
+				return
+			}
+			switch parts[1] {
+			case "watch":
+				handler.WatchTask(w, r, parts[0])
+			case "cancel":
+				handler.CancelTask(w, r, parts[0])
+			default:
+				types.WriteErr(w, 404, "NOT_FOUND", "unknown task operation")
+			}
+			return
 		case r.Method == http.MethodGet && r.URL.Path == "/healthz":
 			types.WriteOK(w, http.StatusOK, map[string]any{"ok": true})
 			return

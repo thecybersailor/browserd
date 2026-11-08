@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	browserdclient "github.com/flaboy/browserd-client-go/pkg/browserd"
+	browserdclient "github.com/thecybersailor/browserd-client-go/pkg/browserd"
 )
 
 func TestEvaluateWithPageToolBridgeReadsPageTitle(t *testing.T) {
@@ -27,7 +27,7 @@ func TestEvaluateWithPageToolBridgeReadsPageTitle(t *testing.T) {
 	}
 	defer func() { _ = client.Close(ctx, session.RuntimeSessionID) }()
 
-	if _, err := client.Navigate(ctx, session.RuntimeSessionID, browserdclient.NavigateInput{
+	if _, err := navigateAndWatch(t, client, ctx, session.RuntimeSessionID, browserdclient.NavigateInput{
 		URL:       "data:text/html,<title>PageTool E2E</title><h1 id='title'>Hello</h1>",
 		WaitUntil: "load",
 	}); err != nil {
@@ -38,7 +38,7 @@ func TestEvaluateWithPageToolBridgeReadsPageTitle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("runtime script: %v", err)
 	}
-	out, err := client.Evaluate(ctx, session.RuntimeSessionID, browserdclient.EvaluateInput{
+	out, err := evaluateAndWatch(t, client, ctx, session.RuntimeSessionID, browserdclient.EvaluateInput{
 		PageToolBridge: &browserdclient.PageToolBridgeConfig{Enabled: true},
 		Script: pageToolScript + `
 const title = await pageTool.page.title();

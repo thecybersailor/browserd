@@ -11,9 +11,9 @@ import (
 	"testing"
 	"time"
 
-	browserdclient "github.com/flaboy/browserd-client-go/pkg/browserd"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
+	browserdclient "github.com/thecybersailor/browserd-client-go/pkg/browserd"
 )
 
 func TestProfileCommitSyncSafety(t *testing.T) {
@@ -67,10 +67,9 @@ func runProfileSyncRound(t *testing.T, baseURL string, workdir string, pageURL s
 	runtimeID := session.RuntimeSessionID
 	defer syncDeleteSession(client, runtimeID)
 
-	if _, err := client.Navigate(context.Background(), runtimeID, browserdclient.NavigateInput{
+	if _, err := navigateAndWatch(t, client, context.Background(), runtimeID, browserdclient.NavigateInput{
 		URL:       pageURL,
 		WaitUntil: "load",
-		TimeoutMs: 15000,
 	}); err != nil {
 		t.Fatalf("navigate failed: %v", err)
 	}
@@ -103,10 +102,9 @@ func runProfileSyncRound(t *testing.T, baseURL string, workdir string, pageURL s
 
 	restored := syncCreateSession(t, client, profilePath)
 	defer syncDeleteSession(client, restored.RuntimeSessionID)
-	if _, err := client.Navigate(context.Background(), restored.RuntimeSessionID, browserdclient.NavigateInput{
+	if _, err := navigateAndWatch(t, client, context.Background(), restored.RuntimeSessionID, browserdclient.NavigateInput{
 		URL:       pageURL,
 		WaitUntil: "load",
-		TimeoutMs: 15000,
 	}); err != nil {
 		t.Fatalf("restored navigate failed: %v", err)
 	}
@@ -159,9 +157,8 @@ func syncCreateSession(t *testing.T, client *browserdclient.Client, profilePath 
 
 func syncEvaluate(t *testing.T, client *browserdclient.Client, runtimeID string, script string) map[string]any {
 	t.Helper()
-	out, err := client.Evaluate(context.Background(), runtimeID, browserdclient.EvaluateInput{
-		Script:    script,
-		TimeoutMs: 15000,
+	out, err := evaluateAndWatch(t, client, context.Background(), runtimeID, browserdclient.EvaluateInput{
+		Script: script,
 	})
 	if err != nil {
 		t.Fatalf("evaluate failed: %v", err)

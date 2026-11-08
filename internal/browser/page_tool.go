@@ -11,7 +11,7 @@ import (
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
-	browserdclient "github.com/flaboy/browserd-client-go/pkg/browserd"
+	browserdclient "github.com/thecybersailor/browserd-client-go/pkg/browserd"
 )
 
 type pageToolTarget struct {
@@ -22,7 +22,7 @@ type pageToolTarget struct {
 	Point    *pointerPoint
 }
 
-func (s *Service) PageTool(runtimeSessionID string, input browserdclient.PageToolInput) (browserdclient.PageToolResult, error) {
+func (s *Service) PageTool(parent context.Context, runtimeSessionID string, input browserdclient.PageToolInput) (browserdclient.PageToolResult, error) {
 	if err := browserdclient.ValidatePageToolInput(input); err != nil {
 		return nil, err
 	}
@@ -35,9 +35,9 @@ func (s *Service) PageTool(runtimeSessionID string, input browserdclient.PageToo
 	case "page.url", "page.title", "page.viewport":
 		return s.pageToolPage(runtimeSessionID, method, input.TimeoutMs)
 	case "page.waitForTimeout":
-		return s.pageToolWaitForTimeout(payload, input.TimeoutMs)
+		return s.pageToolWaitForTimeout(parent, payload, input.TimeoutMs)
 	case "page.waitForLoadState":
-		return s.pageToolWaitForLoadState(runtimeSessionID, payload, input.TimeoutMs)
+		return s.pageToolWaitForLoadState(parent, runtimeSessionID, payload, input.TimeoutMs)
 	case "keyboard.type", "keyboard.press", "keyboard.down", "keyboard.up", "keyboard.insertText":
 		return s.pageToolKeyboard(runtimeSessionID, method, payload, input.TimeoutMs)
 	case "mouse.move", "mouse.click", "mouse.dblclick", "mouse.down", "mouse.up", "mouse.wheel":
@@ -81,7 +81,7 @@ func (s *Service) pageToolPage(runtimeSessionID string, method string, timeoutMs
 	}
 }
 
-func (s *Service) pageToolWaitForTimeout(payload map[string]any, timeoutMs int) (browserdclient.PageToolResult, error) {
+func (s *Service) pageToolWaitForTimeout(parent context.Context, payload map[string]any, timeoutMs int) (browserdclient.PageToolResult, error) {
 	ms := intPayload(payload, "ms", 0)
 	if ms < 0 {
 		return nil, ErrInvalidRequest
@@ -89,16 +89,18 @@ func (s *Service) pageToolWaitForTimeout(payload map[string]any, timeoutMs int) 
 	if timeoutMs > 0 && ms > timeoutMs {
 		return nil, fmt.Errorf("%w: waitForTimeout exceeds timeoutMs", ErrInvalidRequest)
 	}
-	time.Sleep(time.Duration(ms) * time.Millisecond)
+	if err := sleepBehavior(parent, time.Duration(ms)*time.Millisecond); err != nil {
+		return nil, err
+	}
 	return browserdclient.PageToolResult{"ok": true}, nil
 }
 
-func (s *Service) pageToolWaitForLoadState(runtimeSessionID string, payload map[string]any, timeoutMs int) (browserdclient.PageToolResult, error) {
+func (s *Service) pageToolWaitForLoadState(parent context.Context, runtimeSessionID string, payload map[string]any, timeoutMs int) (browserdclient.PageToolResult, error) {
 	state := strings.TrimSpace(stringPayload(payload, "state", "load"))
 	if state == "" {
 		state = "load"
 	}
-	ctx, cancel, err := s.newBrowserContext(runtimeSessionID, timeoutMs)
+	ctx, cancel, err := s.newTaskBrowserContext(parent, runtimeSessionID, timeoutMs)
 	if err != nil {
 		return nil, err
 	}
@@ -136,10 +138,6 @@ func (s *Service) pageToolWaitForLoadState(runtimeSessionID string, payload map[
 				}
 			}
 		})); err != nil {
-			return nil, fmt.Errorf("%w: %v", ErrActionFailed, err)
-		}
-	case "networkidle":
-		if err := chromedp.Run(ctx, chromedp.WaitReady("body", chromedp.ByQuery), chromedp.Sleep(500*time.Millisecond)); err != nil {
 			return nil, fmt.Errorf("%w: %v", ErrActionFailed, err)
 		}
 	default:

@@ -28,7 +28,7 @@ require (
 	github.com/chromedp/cdproto v0.0.0-20250724212937-08a3db8b4327
 	github.com/chromedp/chromedp v0.14.2
 	github.com/chromedp/sysutil v1.1.0 // indirect
-	github.com/flaboy/browserd-client-go v0.1.2-0.20260912063155-059acc20c90f
+	github.com/thecybersailor/browserd-client-go v0.0.0-20261108022430-c9d88aa447a4
 	github.com/go-json-experiment/json v0.0.0-20250725192818-e39067aee2d2 // indirect
 	github.com/gobwas/httphead v0.1.0 // indirect
 	github.com/gobwas/pool v0.2.1 // indirect

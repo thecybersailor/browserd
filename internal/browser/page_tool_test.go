@@ -1,16 +1,17 @@
 package browser
 
 import (
+	"context"
 	"os"
 	"strings"
 	"testing"
 
-	browserdclient "github.com/flaboy/browserd-client-go/pkg/browserd"
+	browserdclient "github.com/thecybersailor/browserd-client-go/pkg/browserd"
 )
 
 func TestPageToolRejectsUnsupportedMethods(t *testing.T) {
 	svc := &Service{}
-	_, err := svc.PageTool("rt_1", browserdclient.PageToolInput{Method: "browser.unsupported"})
+	_, err := svc.PageTool(context.Background(), "rt_1", browserdclient.PageToolInput{Method: "browser.unsupported"})
 	var browserErr browserdclient.Error
 	if !browserdclient.AsError(err, &browserErr) || browserErr.Code != "browserd_pagetool_method_unsupported" {
 		t.Fatalf("expected unsupported method error, got %v", err)

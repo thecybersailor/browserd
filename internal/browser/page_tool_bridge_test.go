@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	browserdclient "github.com/flaboy/browserd-client-go/pkg/browserd"
+	browserdclient "github.com/thecybersailor/browserd-client-go/pkg/browserd"
 )
 
 func TestBuildPageToolBridgeInstallScript(t *testing.T) {

@@ -12,7 +12,7 @@ import (
 
 	cdruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
-	browserdclient "github.com/flaboy/browserd-client-go/pkg/browserd"
+	browserdclient "github.com/thecybersailor/browserd-client-go/pkg/browserd"
 )
 
 var pageToolBridgeIdentifierPattern = regexp.MustCompile(`^[A-Za-z_$][A-Za-z0-9_$]*$`)
@@ -22,7 +22,7 @@ type pageToolBridgeRequest struct {
 	Input     browserdclient.PageToolInput `json:"input"`
 }
 
-func (s *Service) evaluateWithPageToolBridge(runtimeSessionID string, input EvaluateInput) (EvaluateOutput, error) {
+func (s *Service) evaluateWithPageToolBridge(parent context.Context, runtimeSessionID string, input EvaluateInput) (EvaluateOutput, error) {
 	if strings.TrimSpace(input.Script) == "" {
 		return EvaluateOutput{}, ErrInvalidRequest
 	}
@@ -34,7 +34,7 @@ func (s *Service) evaluateWithPageToolBridge(runtimeSessionID string, input Eval
 	if err != nil {
 		return EvaluateOutput{}, fmt.Errorf("%w: args must be JSON serializable", ErrInvalidRequest)
 	}
-	ctx, cancel, err := s.newBrowserContext(runtimeSessionID, input.TimeoutMs)
+	ctx, cancel, err := s.newTaskBrowserContext(parent, runtimeSessionID, input.TimeoutMs)
 	if err != nil {
 		return EvaluateOutput{}, err
 	}
@@ -75,7 +75,7 @@ func (s *Service) handlePageToolBridgeCall(parent context.Context, runtimeSessio
 	err := json.Unmarshal([]byte(payload), &request)
 	var result browserdclient.PageToolResult
 	if err == nil {
-		result, err = s.PageTool(runtimeSessionID, request.Input)
+		result, err = s.PageTool(parent, runtimeSessionID, request.Input)
 	}
 	if strings.TrimSpace(request.RequestID) == "" {
 		return
@@ -103,7 +103,7 @@ func buildPageToolBridgeInstallScript(bridgeName string, nativeBindingName strin
 		return "", ErrInvalidRequest
 	}
 	return fmt.Sprintf(`(() => {
-  const pending = new Map();
+  const pending = new Map(); let sequence = 0;
   window.__browserdResolvePageToolCall = (requestId, result, error) => {
     const entry = pending.get(requestId);
     if (!entry) return;
@@ -112,7 +112,7 @@ func buildPageToolBridgeInstallScript(bridgeName string, nativeBindingName strin
     else entry.resolve(result);
   };
   window.%s = (input) => new Promise((resolve, reject) => {
-    const requestId = (globalThis.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random();
+    const requestId = String(++sequence);
     pending.set(requestId, { resolve, reject });
     try {
       window.%s(JSON.stringify({ requestId, input }));
@@ -144,11 +144,6 @@ func buildPageToolBridgeResolveScript(bridgeName string, requestID string, resul
   const error = %s;
   if (typeof window.__browserdResolvePageToolCall === "function") {
     window.__browserdResolvePageToolCall(requestId, result, error);
-    return true;
-  }
-  const bridge = window[bridgeName];
-  if (bridge && typeof bridge.__resolve === "function") {
-    bridge.__resolve(requestId, result, error);
     return true;
   }
   return false;

@@ -110,7 +110,8 @@ Content-Type: application/json
 {
   "url": "https://www.baidu.com/",
   "waitUntil": "load",
-  "timeoutMs": 30000,
+  "request_id": "navigation-unique-request",
+  "executionTimeoutMs": 300000,
   "afterLoadScreenshotS3Path": "s3://browserd-snapshots/team_1/conv_1/1737373333.png"
 }
 ```
@@ -119,6 +120,27 @@ Content-Type: application/json
 - `navigate` 是唯一的页面跳转接口，不新增 `relocation` 同义接口。
 - `afterLoadScreenshotS3Path` 为可选字段，必须传完整 `s3://bucket/key`。
 - 截图 bucket 不从 `profilePath` 推导，允许与 userdata bucket 不同。
+
+### Browser tasks
+
+`navigate`, `evaluate`, `/wait-for` and external `pageTool.page.waitForLoadState` always submit tasks. Supply `request_id` and optional `executionTimeoutMs`; the old execution `timeoutMs` and synchronous result contract are rejected. Same request ID with changed input fails; the same input refers to the same task.
+
+```http
+POST /v1/tasks/{browserd_task_id}/watch
+Content-Type: application/json
+
+{"timeoutMs":10000}
+```
+
+Watch accepts 0..30000 ms. A window ending returns `running`, not an execution failure. Response data contains `browserd_task_id`, `state`, and `info` (operation, runtimeSessionId, stage, elapsedMs, sessionUsable, result/error). Only `succeeded` has the completed result. States are `running`, `cancelling`, `succeeded`, `failed`, `cancelled`, `timed_out`.
+
+Cancel using `POST /v1/tasks/{browserd_task_id}/cancel` with `{}`. Cancellation invalidates and closes the browser session to ensure no script or navigation continues; create a new session before further page actions. A session remains exclusive until the worker and cleanup stop. Other operations fail `SESSION_BUSY`; they are never queued.
+
+Tasks share the owning browserd process lifetime. Restarted-process IDs fail `TASK_INSTANCE_LOST`; terminal results expire after 24 hours. Active/retained task capacity is 4096, result limit 8 MiB. Tasks are not automatically resumed or replayed.
+
+`act.waitFor` was removed. Use `/wait-for` with a condition (`url_contains`, `url_matches`, `text_visible`, `text_gone`, `element_visible`, `element_enabled`, `element_editable`, `ref_actionable`). `page.waitForLoadState` supports `load` and `domcontentloaded`; `networkidle` is explicitly unsupported. Internal pageTool calls inherit the parent task and do not submit nested public tasks.
+
+Session creation, screenshots, commits and profile transfer remain controlled synchronous operations; their timeouts indicate a system fault. SDK: `github.com/thecybersailor/browserd-client-go/pkg/browserd`.
 
 ### Snapshot
 ```http
@@ -198,7 +220,7 @@ Content-Type: application/json
 ```
 
 约束：
-- `click` / `fill` / `press` / `hover` / `select` / `waitFor` 只接受 `e*`
+- `click` / `fill` / `press` / `hover` / `select` 只接受 `e*`
 - `click` 可不传 `ref`，改传视口坐标 `x` / `y`；坐标点击同样通过 CDP mouse events 执行
 - `click` 通过 CDP mouse events 执行，默认 `motionProfile=humanized` 会先生成 mousemove 轨迹再 press/release
 - live viewer 会显示 browserd 内部虚拟鼠标；虚拟鼠标由 `/act` 的 mousemove/press/release 状态驱动，不修改目标页面 DOM，也不改变 `/v1/sessions/{runtimeSessionId}/act` 的外部请求结构
@@ -254,7 +276,7 @@ in go.mod. Existing clients that require
 do not add empty groups or silently fall back to legacy data to conceal this.
 
 Set `includeSnapshot: true` on `POST /v1/sessions/{runtimeSessionId}/navigate`
-with `waitUntil: "load"` (or omit waitUntil). The response includes
+with `waitUntil: "load"` (or omit waitUntil). The successful task result includes
 `snapshot: {snapshotId, page}`; page URL/title are also the navigation result's
 URL/title. The returned refs are already registered and can be used immediately.
 `snapshotCleared: true` means the **previous** snapshot state was cleared, not
@@ -263,14 +285,13 @@ navigation-only response. Other waitUntil modes are not implemented by this
 runtime; combined navigation explicitly rejects them instead of pretending to
 honor them.
 
-Navigation and snapshot extraction share timeoutMs (default runtime budget:
-20 seconds), and request cancellation cancels the combined operation. A load
+Navigation and snapshot extraction share executionTimeoutMs (default 300000 ms, maximum 1800000 ms). Submission returns HTTP 202 and browserd_task_id. Submission/watch HTTP cancellation never cancels the task; only explicit cancel or the execution deadline stops it. A load
 event is not proof of complete application data: inspect the observation and,
 when needed, explicitly wait for an observed page condition before taking a new
 snapshot. For example use `condition: {type: "element_visible", selector: "#buy"}`.
 There is no fixed sleep or implicit second snapshot request.
 
-Snapshot extraction failure returns `502 SNAPSHOT_FAILED`, with no valid
+Snapshot extraction failure ends the task with `failed` and `SNAPSHOT_FAILED`, with no valid
 snapshot; navigation may already have happened. Old snapshot state is not
 restored. Conflicting same-session HTTP operations return `409 SESSION_BUSY`
 without executing, including handoff and deletion. Different sessions remain

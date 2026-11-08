@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -21,7 +22,7 @@ import (
 	"browserd/internal/router"
 	"browserd/internal/session"
 
-	browserdclient "github.com/flaboy/browserd-client-go/pkg/browserd"
+	browserdclient "github.com/thecybersailor/browserd-client-go/pkg/browserd"
 )
 
 type fakeBrowserRuntime struct {
@@ -114,12 +115,12 @@ func (f *fakeBrowserRuntime) UploadFiles(_ string, input browser.UploadFilesInpu
 	return f.uploadOut, f.uploadErr
 }
 
-func (f *fakeBrowserRuntime) Evaluate(_ string, input browser.EvaluateInput) (browser.EvaluateOutput, error) {
+func (f *fakeBrowserRuntime) Evaluate(_ context.Context, _ string, input browser.EvaluateInput) (browser.EvaluateOutput, error) {
 	f.evaluateCalls = append(f.evaluateCalls, input)
 	return f.evaluateOut, f.evaluateErr
 }
 
-func (f *fakeBrowserRuntime) PageTool(_ string, input browserdclient.PageToolInput) (browserdclient.PageToolResult, error) {
+func (f *fakeBrowserRuntime) PageTool(_ context.Context, _ string, input browserdclient.PageToolInput) (browserdclient.PageToolResult, error) {
 	f.pageToolCalls = append(f.pageToolCalls, input)
 	if f.pageToolOut != nil || f.pageToolErr != nil {
 		return f.pageToolOut, f.pageToolErr
@@ -127,7 +128,7 @@ func (f *fakeBrowserRuntime) PageTool(_ string, input browserdclient.PageToolInp
 	return browserdclient.PageToolResult{"value": "Example"}, nil
 }
 
-func (f *fakeBrowserRuntime) WaitFor(_ string, input browser.WaitForInput) (browser.WaitForOutput, error) {
+func (f *fakeBrowserRuntime) WaitFor(_ context.Context, _ string, input browser.WaitForInput) (browser.WaitForOutput, error) {
 	f.waitForCalls = append(f.waitForCalls, input)
 	return f.waitForOut, f.waitForErr
 }
@@ -422,7 +423,7 @@ func TestWaitFor_ForwardsActionabilityCondition(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
-	controller.WaitFor(rr, req, "rt_1")
+	runBrowserTask(t, controller, controller.WaitFor, rr, req, "rt_1")
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
@@ -451,7 +452,7 @@ func TestWaitFor_ForwardsTextVisibleCondition(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 
-	controller.WaitFor(rr, req, "rt_1")
+	runBrowserTask(t, controller, controller.WaitFor, rr, req, "rt_1")
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
@@ -863,7 +864,7 @@ func TestNavigate_ForwardsAfterLoadScreenshotS3Path(t *testing.T) {
 	}`)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
-	handler.Navigate(rr, req, "rt_1")
+	runBrowserTask(t, handler, handler.Navigate, rr, req, "rt_1")
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
@@ -991,7 +992,7 @@ func TestScreenshot_RejectsFullPage(t *testing.T) {
 func TestNavigateRoute_RejectsUnknownSession(t *testing.T) {
 	h := router.New(config.Config{Port: 7011, CDPBaseURL: "ws://browserd:9222/devtools/browser"})
 
-	req := httptest.NewRequest(http.MethodPost, "/v1/sessions/rt_missing/navigate", bytes.NewReader([]byte(`{"url":"https://example.com"}`)))
+	req := httptest.NewRequest(http.MethodPost, "/v1/sessions/rt_missing/navigate", bytes.NewReader([]byte(`{"request_id":"unknown-session-test","url":"https://example.com"}`)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
@@ -1215,7 +1216,7 @@ func TestEvaluate_ReturnsJSONResult(t *testing.T) {
 	}`)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
-	handler.Evaluate(rr, req, rid)
+	runBrowserTask(t, handler, handler.Evaluate, rr, req, rid)
 	if rr.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d body=%s", rr.Code, rr.Body.String())
 	}
@@ -1283,7 +1284,7 @@ func TestEvaluate_ForwardsPageToolBridgeConfig(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions/"+rid+"/evaluate", strings.NewReader(`{"script":"return true","pageToolBridge":{"enabled":true,"name":"__browserdPageToolCall"}}`))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
-	handler.Evaluate(rr, req, rid)
+	runBrowserTask(t, handler, handler.Evaluate, rr, req, rid)
 
 	if rr.Code != http.StatusOK {
 		t.Fatalf("status = %d body=%s", rr.Code, rr.Body.String())
@@ -1321,7 +1322,7 @@ func TestEvaluate_DuringHandoffRequiresExplicitOptIn(t *testing.T) {
 	}`)))
 	blockedReq.Header.Set("Content-Type", "application/json")
 	blockedRR := httptest.NewRecorder()
-	handler.Evaluate(blockedRR, blockedReq, rid)
+	runBrowserTask(t, handler, handler.Evaluate, blockedRR, blockedReq, rid)
 	if blockedRR.Code != http.StatusConflict {
 		t.Fatalf("expected active handoff evaluate to be blocked, got %d body=%s", blockedRR.Code, blockedRR.Body.String())
 	}
@@ -1335,7 +1336,7 @@ func TestEvaluate_DuringHandoffRequiresExplicitOptIn(t *testing.T) {
 	}`)))
 	allowedReq.Header.Set("Content-Type", "application/json")
 	allowedRR := httptest.NewRecorder()
-	handler.Evaluate(allowedRR, allowedReq, rid)
+	runBrowserTask(t, handler, handler.Evaluate, allowedRR, allowedReq, rid)
 	if allowedRR.Code != http.StatusOK {
 		t.Fatalf("expected explicit opt-in evaluate to pass, got %d body=%s", allowedRR.Code, allowedRR.Body.String())
 	}
@@ -1486,7 +1487,7 @@ func TestEvaluate_MapsNonJSONResultErrorCode(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions/"+rid+"/evaluate", bytes.NewReader([]byte(`{"script":"return document.body"}`)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
-	handler.Evaluate(rr, req, rid)
+	runBrowserTask(t, handler, handler.Evaluate, rr, req, rid)
 	if rr.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d body=%s", rr.Code, rr.Body.String())
 	}
@@ -1647,7 +1648,7 @@ func TestHandoffControlDisconnectAutoCompletesAfterGrace(t *testing.T) {
 
 	assertNavigateStatus(t, handler, rid, http.StatusConflict)
 	eventually(t, 500*time.Millisecond, func() bool {
-		return navigateStatus(handler, rid) == http.StatusOK
+		return navigateStatus(t, handler, rid) == http.StatusOK
 	})
 
 	revokedRR := httptest.NewRecorder()
@@ -1676,7 +1677,7 @@ func TestHandoffControlReconnectCancelsAutoComplete(t *testing.T) {
 	releaseSecond()
 	<-secondDone
 	eventually(t, 500*time.Millisecond, func() bool {
-		return navigateStatus(handler, rid) == http.StatusOK
+		return navigateStatus(t, handler, rid) == http.StatusOK
 	})
 }
 
@@ -1807,16 +1808,16 @@ func serveLiveWebsockify(t *testing.T, handler *controller.SessionController, to
 
 func assertNavigateStatus(t *testing.T, handler *controller.SessionController, rid string, want int) {
 	t.Helper()
-	if got := navigateStatus(handler, rid); got != want {
+	if got := navigateStatus(t, handler, rid); got != want {
 		t.Fatalf("expected navigate status %d, got %d", want, got)
 	}
 }
 
-func navigateStatus(handler *controller.SessionController, rid string) int {
+func navigateStatus(t *testing.T, handler *controller.SessionController, rid string) int {
 	req := httptest.NewRequest(http.MethodPost, "/v1/sessions/"+rid+"/navigate", bytes.NewReader([]byte(`{"url":"https://example.com"}`)))
 	req.Header.Set("Content-Type", "application/json")
 	rr := httptest.NewRecorder()
-	handler.Navigate(rr, req, rid)
+	runBrowserTask(t, handler, handler.Navigate, rr, req, rid)
 	return rr.Code
 }
 
@@ -1887,7 +1888,7 @@ func TestNavigateIncludeSnapshotContract(t *testing.T) {
 	for _, wait := range []string{"load", "networkidle"} {
 		rr := httptest.NewRecorder()
 		req := httptest.NewRequest("POST", "/v1/sessions/rt/navigate", strings.NewReader(`{"url":"https://example.com/","includeSnapshot":true,"waitUntil":"`+wait+`"}`))
-		handler.Navigate(rr, req, "rt")
+		runBrowserTask(t, handler, handler.Navigate, rr, req, "rt")
 		if wait == "load" {
 			if rr.Code != 200 || !strings.Contains(rr.Body.String(), `"snapshotId":"s"`) {
 				t.Fatalf("missing snapshot: %s", rr.Body.String())
@@ -1924,10 +1925,10 @@ func TestSessionOperationGuardRejectsInterleaving(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		h.Navigate(httptest.NewRecorder(), httptest.NewRequest("POST", "/", strings.NewReader(`{"url":"https://example.com/"}`)), "one")
+		runBrowserTask(t, h, h.Navigate, httptest.NewRecorder(), httptest.NewRequest("POST", "/", strings.NewReader(`{"url":"https://example.com/"}`)), "one")
 	}()
 	<-b.started
-	for _, call := range []func(http.ResponseWriter, *http.Request, string){h.Snapshot, h.Act, h.Evaluate, h.PageTool, h.WaitFor, h.Screenshot, h.UploadFiles, h.CommitSession, h.DeleteSession, h.StartHandoff} {
+	for _, call := range []func(http.ResponseWriter, *http.Request, string){h.Snapshot, h.Act, h.Screenshot, h.UploadFiles, h.CommitSession, h.DeleteSession, h.StartHandoff} {
 		rr := httptest.NewRecorder()
 		call(rr, httptest.NewRequest("POST", "/", strings.NewReader(`{}`)), "one")
 		if rr.Code != 409 || !strings.Contains(rr.Body.String(), "SESSION_BUSY") {
@@ -1965,4 +1966,41 @@ func (f *fakeBrowserRuntime) ImportCookieConfig(id string, config browser.Cookie
 func (f *fakeBrowserRuntime) ImportProfileCookies(config browser.CookieConfig) (int, error) {
 	_, err := f.ImportCookies("", config.Cookies)
 	return 0, err
+}
+
+// runBrowserTask exercises the new submit/watch protocol for result assertions.
+func runBrowserTask(t *testing.T, h *controller.SessionController, submit func(http.ResponseWriter, *http.Request, string), rr *httptest.ResponseRecorder, req *http.Request, id string) {
+	t.Helper()
+	var body map[string]any
+	if err := json.NewDecoder(req.Body).Decode(&body); err != nil {
+		t.Fatal(err)
+	}
+	body["request_id"] = fmt.Sprintf("test-%d", time.Now().UnixNano())
+	if old, ok := body["timeoutMs"]; ok {
+		body["executionTimeoutMs"] = old
+		delete(body, "timeoutMs")
+	}
+	raw, _ := json.Marshal(body)
+	req.Body = io.NopCloser(bytes.NewReader(raw))
+	submit(rr, req, id)
+	if rr.Code != 202 {
+		return
+	}
+	taskID := decodeData(t, rr)["browserd_task_id"].(string)
+	watch := httptest.NewRecorder()
+	h.WatchTask(watch, httptest.NewRequest("POST", "/", strings.NewReader(`{"timeoutMs":30000}`)), taskID)
+	data := decodeData(t, watch)
+	info := data["info"].(map[string]any)
+	rr.Body.Reset()
+	rr.Code = 200
+	if data["state"] == "succeeded" {
+		json.NewEncoder(rr.Body).Encode(map[string]any{"data": info["result"], "error": nil})
+		return
+	}
+	failure := info["error"].(map[string]any)
+	rr.Code = 502
+	if failure["code"] == "EVALUATE_RESULT_NOT_JSON" {
+		rr.Code = 400
+	}
+	json.NewEncoder(rr.Body).Encode(map[string]any{"data": nil, "error": failure})
 }

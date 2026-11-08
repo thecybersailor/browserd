@@ -3,7 +3,7 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
-	publicbrowserd "github.com/flaboy/browserd-client-go/pkg/browserd"
+	publicbrowserd "github.com/thecybersailor/browserd-client-go/pkg/browserd"
 	"net/http"
 	"net/http/httptest"
 	"os"

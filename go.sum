@@ -42,10 +42,6 @@ github.com/chromedp/chromedp v0.14.2 h1:r3b/WtwM50RsBZHMUm9fsNhhzRStTHrKdr2zmwbZ
 github.com/chromedp/chromedp v0.14.2/go.mod h1:rHzAv60xDE7VNy/MYtTUrYreSc0ujt2O1/C3bzctYBo=
 github.com/chromedp/sysutil v1.1.0 h1:PUFNv5EcprjqXZD9nJb9b/c9ibAbxiYo4exNWZyipwM=
 github.com/chromedp/sysutil v1.1.0/go.mod h1:WiThHUdltqCNKGc4gaU50XgYjwjYIhKWoHGPTUfWTJ8=
-github.com/flaboy/browserd-client-go v0.1.1 h1:zdlA8/ZhtQ6H2461RIF5AOz8QR50ftplTlY1Gz+Risw=
-github.com/flaboy/browserd-client-go v0.1.1/go.mod h1:ozE5GAQjtmz4kw+ntgtOY/ezDGjV5zVEL6P7Vgc/TtQ=
-github.com/flaboy/browserd-client-go v0.1.2-0.20260912063155-059acc20c90f h1:fA2+FzyC2xIzomY7DVHLwcjD+3Ei/Pw0K4SLFQy285s=
-github.com/flaboy/browserd-client-go v0.1.2-0.20260912063155-059acc20c90f/go.mod h1:ozE5GAQjtmz4kw+ntgtOY/ezDGjV5zVEL6P7Vgc/TtQ=
 github.com/go-json-experiment/json v0.0.0-20250725192818-e39067aee2d2 h1:iizUGZ9pEquQS5jTGkh4AqeeHCMbfbjeb0zMt0aEFzs=
 github.com/go-json-experiment/json v0.0.0-20250725192818-e39067aee2d2/go.mod h1:TiCD2a1pcmjd7YnhGH0f/zKNcCD06B029pHhzV23c2M=
 github.com/gobwas/httphead v0.1.0 h1:exrUm0f4YX0L7EBwZHuCF4GDp8aJfVeBrlLQrs6NqWU=
@@ -58,6 +54,8 @@ github.com/ledongthuc/pdf v0.0.0-20220302134840-0c2507a12d80 h1:6Yzfa6GP0rIo/kUL
 github.com/ledongthuc/pdf v0.0.0-20220302134840-0c2507a12d80/go.mod h1:imJHygn/1yfhB7XSJJKlFZKl/J+dCPAknuiaGOshXAs=
 github.com/orisano/pixelmatch v0.0.0-20220722002657-fb0b55479cde h1:x0TT0RDC7UhAVbbWWBzr41ElhJx5tXPWkIHA2HWPRuw=
 github.com/orisano/pixelmatch v0.0.0-20220722002657-fb0b55479cde/go.mod h1:nZgzbfBr3hhjoZnS66nKrHmduYNpc34ny7RK4z5/HM0=
+github.com/thecybersailor/browserd-client-go v0.0.0-20261108022430-c9d88aa447a4 h1:w0UoL/pZ4D3/Va5a9pKw/K1M9PXfJeWG2EtgEEPTF54=
+github.com/thecybersailor/browserd-client-go v0.0.0-20261108022430-c9d88aa447a4/go.mod h1:mOXy5X8NLDLyZPeu+DebZLR8Zm7AsiPN14gvg0qAoqY=
 golang.org/x/sys v0.6.0/go.mod h1:oPkhp1MJrh7nUepCBck5+mAzfO9JrbApNNgaTdGDITg=
 golang.org/x/sys v0.34.0 h1:H5Y5sJ2L2JRdyv7ROF1he/lPdvFsd0mJHFw2ThKHxLA=
 golang.org/x/sys v0.34.0/go.mod h1:BJP2sWEmIv4KK5OTEluFJCKSidICx8ciO85XgH3Ak8k=

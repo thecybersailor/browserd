@@ -33,9 +33,9 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/chromedp"
 	"github.com/chromedp/chromedp/kb"
-	browserdclient "github.com/flaboy/browserd-client-go/pkg/browserd"
 	"github.com/gobwas/ws"
 	"github.com/gobwas/ws/wsutil"
+	browserdclient "github.com/thecybersailor/browserd-client-go/pkg/browserd"
 )
 
 var (
@@ -807,16 +807,6 @@ func (s *Service) Act(runtimeSessionID string, input ActInput) (ActOutput, error
 		}
 		selector := refState.Selector
 		err = chromedp.Run(ctx, chromedp.Evaluate(fmt.Sprintf(`(() => { const el = document.querySelector(%q); if (!el) throw new Error("missing"); const values = %s; for (const opt of el.options ?? []) { opt.selected = values.includes(opt.value); } el.dispatchEvent(new Event("input", {bubbles:true})); el.dispatchEvent(new Event("change", {bubbles:true})); return true; })()`, selector, jsStringArray(input.Values)), nil))
-	case "waitFor":
-		refState, refErr := s.state.GetRef(runtimeSessionID, input.Ref)
-		if refErr != nil {
-			return ActOutput{}, refErr
-		}
-		if err := validateActionRef(input.Action, refState); err != nil {
-			return ActOutput{}, err
-		}
-		selector := refState.Selector
-		err = chromedp.Run(ctx, chromedp.WaitVisible(selector, chromedp.ByQuery))
 	default:
 		return ActOutput{}, ErrInvalidRequest
 	}
@@ -839,7 +829,7 @@ func (s *Service) Act(runtimeSessionID string, input ActInput) (ActOutput, error
 	}, nil
 }
 
-func (s *Service) WaitFor(runtimeSessionID string, input WaitForInput) (WaitForOutput, error) {
+func (s *Service) WaitFor(parent context.Context, runtimeSessionID string, input WaitForInput) (WaitForOutput, error) {
 	if strings.TrimSpace(input.Condition.Type) == "" {
 		return WaitForOutput{}, ErrInvalidRequest
 	}
@@ -855,7 +845,7 @@ func (s *Service) WaitFor(runtimeSessionID string, input WaitForInput) (WaitForO
 	if stableMs < 0 {
 		return WaitForOutput{}, ErrInvalidRequest
 	}
-	ctx, cancel, err := s.newBrowserContext(runtimeSessionID, timeoutMs)
+	ctx, cancel, err := s.newTaskBrowserContext(parent, runtimeSessionID, timeoutMs)
 	if err != nil {
 		return WaitForOutput{}, err
 	}
@@ -1066,7 +1056,7 @@ func validateActionRef(action string, ref browserrt.RefState) error {
 	switch action {
 	case "scrollIntoView":
 		return nil
-	case "click", "doubleClick", "hover", "type", "fill", "press", "select", "waitFor":
+	case "click", "doubleClick", "hover", "type", "fill", "press", "select":
 		if ref.Kind != "element" {
 			return browserrt.ErrInvalidRef
 		}
@@ -2023,9 +2013,9 @@ func validScreenshotBytes(body []byte, contentType string) bool {
 	}
 }
 
-func (s *Service) Evaluate(runtimeSessionID string, input EvaluateInput) (EvaluateOutput, error) {
+func (s *Service) Evaluate(parent context.Context, runtimeSessionID string, input EvaluateInput) (EvaluateOutput, error) {
 	if input.PageToolBridge != nil && input.PageToolBridge.Enabled {
-		return s.evaluateWithPageToolBridge(runtimeSessionID, input)
+		return s.evaluateWithPageToolBridge(parent, runtimeSessionID, input)
 	}
 	if strings.TrimSpace(input.Script) == "" {
 		return EvaluateOutput{}, ErrInvalidRequest
@@ -2038,7 +2028,7 @@ func (s *Service) Evaluate(runtimeSessionID string, input EvaluateInput) (Evalua
 	if err != nil {
 		return EvaluateOutput{}, fmt.Errorf("%w: args must be JSON serializable", ErrInvalidRequest)
 	}
-	ctx, cancel, err := s.newBrowserContext(runtimeSessionID, input.TimeoutMs)
+	ctx, cancel, err := s.newTaskBrowserContext(parent, runtimeSessionID, input.TimeoutMs)
 	if err != nil {
 		return EvaluateOutput{}, err
 	}
@@ -2088,6 +2078,31 @@ func browserEvaluateRuntimeScript(script string, argsJSON string) string {
     return null;
   }
 })()`, argsJSON, script)
+}
+
+func (s *Service) newTaskBrowserContext(parent context.Context, id string, timeoutMs int) (context.Context, context.CancelFunc, error) {
+	if err := parent.Err(); err != nil {
+		return nil, nil, err
+	}
+	if timeoutMs <= 0 {
+		if deadline, ok := parent.Deadline(); ok {
+			remaining := time.Until(deadline).Milliseconds()
+			if remaining <= 0 {
+				return nil, nil, context.DeadlineExceeded
+			}
+			timeoutMs = int(remaining)
+		}
+	}
+	ctx, cancel, err := s.newBrowserContext(id, timeoutMs)
+	if err != nil {
+		return nil, nil, err
+	}
+	stop := context.AfterFunc(parent, cancel)
+	if deadline, ok := parent.Deadline(); ok {
+		child, childCancel := context.WithDeadline(ctx, deadline)
+		return child, func() { stop(); childCancel(); cancel() }, nil
+	}
+	return ctx, func() { stop(); cancel() }, nil
 }
 
 func (s *Service) newBrowserContext(runtimeSessionID string, timeoutMs int) (context.Context, context.CancelFunc, error) {
